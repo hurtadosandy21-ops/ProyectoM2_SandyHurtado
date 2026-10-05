@@ -10,9 +10,10 @@ const options = {
       description: 'API desarrollada con Node.js, Express y PostgreSQL',
     },
     servers: [
-      {
-        url: 'http://localhost:3000',
-      },
+     {
+      url: '/',
+     description: 'Servidor actual'
+     },
     ],
   },
   apis: ['./src/routes/*.js'],
