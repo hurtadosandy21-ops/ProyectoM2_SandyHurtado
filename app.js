@@ -1,17 +1,19 @@
 const express = require('express');
 const cors = require('cors');
-
-// Importar las rutas de autores y posts (las crearemos en el siguiente paso)
+const { swaggerUi, specs } = require('./src/config/swagger');
 const authorRoutes = require('./src/routes/authorRoutes');
 const postRoutes = require('./src/routes/postRoutes');
 
+// Importar el middleware de errores
+const errorHandler = require('./src/middlewares/errorHandler');
+
 const app = express();
 
-// --- Middlewares esenciales ---
 app.use(cors());
 app.use(express.json());
 
-// --- Ruta raíz de bienvenida ---
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
+
 app.get('/', (req, res) => {
   res.json({ 
     message: '🚀 Bienvenido a la API de MiniBlog - DevSpark',
@@ -19,13 +21,15 @@ app.get('/', (req, res) => {
   });
 });
 
-// --- Registrar las rutas de la API ---
 app.use('/authors', authorRoutes);
 app.use('/posts', postRoutes);
 
-// --- Manejo de rutas no encontradas (404) ---
+// Ruta 404
 app.use((req, res, next) => {
   res.status(404).json({ error: 'Ruta no encontrada' });
 });
+
+// --- ¡CRÍTICO! El middleware de errores va al final absoluto ---
+app.use(errorHandler);
 
 module.exports = app;

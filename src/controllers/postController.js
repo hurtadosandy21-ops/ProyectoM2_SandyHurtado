@@ -2,17 +2,17 @@ const postService = require('../services/postService');
 
 const postController = {
   // GET /posts
-  async getAllPosts(req, res) {
+  async getAllPosts(req, res, next) {
     try {
       const posts = await postService.getAll();
       res.status(200).json(posts);
     } catch (error) {
-      res.status(500).json({ error: 'Error al obtener los posts' });
+      next(error);
     }
   },
 
   // GET /posts/:id
-  async getPostById(req, res) {
+  async getPostById(req, res, next) {
     try {
       const { id } = req.params;
       const post = await postService.getById(id);
@@ -23,50 +23,48 @@ const postController = {
       
       res.status(200).json(post);
     } catch (error) {
-      res.status(500).json({ error: 'Error al buscar el post' });
+      next(error);
     }
   },
 
   // GET /posts/author/:authorId
-  async getPostsByAuthor(req, res) {
+  async getPostsByAuthor(req, res, next) {
     try {
       const { authorId } = req.params;
       const posts = await postService.getByAuthorId(authorId);
       res.status(200).json(posts);
     } catch (error) {
-      res.status(500).json({ error: 'Error al obtener los posts del autor' });
+      next(error);
     }
   },
 
   // POST /posts
-  async createPost(req, res) {
+  async createPost(req, res, next) {
     try {
       const { author_id, title, content, published } = req.body;
 
-      // Validaciones requeridas
+      // Validaciones requeridas (400)
       if (!author_id || !title || title.trim() === '' || !content || content.trim() === '') {
-        return res.status(400).json({ error: 'Los campos author_id, title y content son obligatorios' });
+        return res.status(400).json({ error: 'Los campos title, content y author_id son obligatorios' });
       }
 
       const newPost = await postService.create(author_id, title, content, published);
       res.status(201).json(newPost);
     } catch (error) {
-      // Código PostgreSQL si el autor no existe (Violación de Llave Foránea)
-      if (error.code === '23503') {
-        return res.status(400).json({ error: 'El author_id especificado no existe en la base de datos' });
-      }
-      res.status(500).json({ error: 'Error al crear el post' });
+      // 🚀 AQUÍ ESTÁ EL SECRETO: Al usar next(error), enviamos el error 
+      // directamente al middleware errorHandler.js donde Postgres procesará el '23503'
+      next(error);
     }
   },
-
+  
   // PUT /posts/:id
-  async updatePost(req, res) {
+  async updatePost(req, res, next) {
     try {
       const { id } = req.params;
       const { title, content, published } = req.body;
 
-      if (!title || title.trim() === '' || !content || content.trim() === '') {
-        return res.status(400).json({ error: 'Los campos title y content son obligatorios' });
+      if (!title || !content) {
+        return res.status(400).json({ error: "Los campos title y content son obligatorios" });
       }
 
       const updatedPost = await postService.update(id, title, content, published);
@@ -77,23 +75,24 @@ const postController = {
 
       res.status(200).json(updatedPost);
     } catch (error) {
-      res.status(500).json({ error: 'Error al actualizar el post' });
+      next(error);
     }
   },
 
   // DELETE /posts/:id
-  async deletePost(req, res) {
+  async deletePost(req, res, next) {
     try {
       const { id } = req.params;
       const deletedPost = await postService.remove(id);
 
       if (!deletedPost) {
-        return res.status(404).json({ error: 'Post no encontrado para eliminar' });
+        return res.status(404).json({ error: 'Post no encontrado' });
       }
 
-      res.status(200).json({ message: 'Post eliminado correctamente', deletedPost });
+      // Éxito de eliminación: Código 204 sin contenido
+      return res.status(204).send();
     } catch (error) {
-      res.status(500).json({ error: 'Error al eliminar el post' });
+      next(error);
     }
   }
 };

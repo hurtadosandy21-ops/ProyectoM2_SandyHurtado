@@ -26,17 +26,11 @@ const postService = {
     return result.rows;
   },
 
-  // Crear un nuevo post
+   // Crear un nuevo post
   async create(author_id, title, content, published) {
-    const query = `
-      INSERT INTO posts (author_id, title, content, published) 
-      VALUES ($1, $2, $3, $4) 
-      RETURNING *;
-    `;
-    // Si published no viene definido, por defecto lo ponemos en false o true según convenga
-    const isPublished = published !== undefined ? published : false;
-    const values = [author_id, title, content, isPublished];
-    
+   // Sin try/catch aquí para que el error original de Postgres suba intacto
+    const query = 'INSERT INTO posts (author_id, title, content, published) VALUES ($1, $2, $3, $4) RETURNING *';
+    const values = [author_id, title, content, published ?? false];
     const result = await pool.query(query, values);
     return result.rows[0];
   },
