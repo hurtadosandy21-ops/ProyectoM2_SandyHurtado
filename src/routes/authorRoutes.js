@@ -86,6 +86,24 @@ router.get('/:id', authorController.getAuthorById);
  *     responses:
  *       201:
  *         description: Autor creado exitosamente.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                   format: uuid
+ *                   example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+ *                 name:
+ *                   type: string
+ *                   example: "Sandy Hurtado"
+ *                 email:
+ *                   type: string
+ *                   example: "Sandy@example.com"
+ *                 bio:
+ *                   type: string
+ *                   example: "Desarrolladora Full Stack 79"
  *       400:
  *         description: Datos inválidos o email duplicado.
  */
