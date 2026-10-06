@@ -15,26 +15,27 @@ const authorService = {
 
   // Crear un nuevo autor
   async create(name, email, bio) {
-    const query = `
-      INSERT INTO authors (name, email, bio) 
-      VALUES ($1, $2, $3) 
-      RETURNING *;
-    `;
-    const values = [name, email, bio || null];
-    const result = await pool.query(query, values);
+    const result = await pool.query(
+      `INSERT INTO authors (name, email, bio)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [name, email, bio ?? null]
+    );
     return result.rows[0];
   },
 
   // Actualizar un autor
+  // COALESCE: si email o bio llegan como null, se conserva el valor que ya tenía
   async update(id, name, email, bio) {
     const query = `
-      UPDATE authors 
-      SET name = $1, email = $2, bio = $3 
-      WHERE id = $4 
+      UPDATE authors
+      SET name = $1,
+          email = COALESCE($2, email),
+          bio = COALESCE($3, bio)
+      WHERE id = $4
       RETURNING *;
     `;
-    const values = [name, email, bio || null, id];
-    const result = await pool.query(query, values);
+    const result = await pool.query(query, [name, email, bio, id]);
     return result.rows[0];
   },
 
@@ -42,7 +43,7 @@ const authorService = {
   async remove(id) {
     const result = await pool.query('DELETE FROM authors WHERE id = $1 RETURNING *', [id]);
     return result.rows[0];
-  }
+  },
 };
 
 module.exports = authorService;

@@ -36,6 +36,7 @@ module.exports = {
       },
       AuthorUpdate: {
         type: 'object',
+        required: ['name'],
         properties: {
           name: { type: 'string', example: 'Sandy Hurtado' },
           email: { type: 'string', format: 'email', example: 'sandy@example.com' },
@@ -52,6 +53,24 @@ module.exports = {
           published: { type: 'boolean', example: false },
         },
       },
+      PostWithAuthor: {
+        allOf: [
+          { $ref: '#/components/schemas/Post' },
+          {
+            type: 'object',
+            properties: {
+              author: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string', format: 'uuid', example: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' },
+                  name: { type: 'string', example: 'Sandy Hurtado' },
+                  email: { type: 'string', format: 'email', example: 'sandy@example.com' },
+                },
+              },
+            },
+          },
+        ],
+      },
       PostInput: {
         type: 'object',
         required: ['title', 'content', 'author_id'],
@@ -59,10 +78,12 @@ module.exports = {
           title: { type: 'string', example: 'Mi primer post en MiniBlog' },
           content: { type: 'string', example: 'Contenido interesante de desarrollo web.' },
           author_id: { type: 'string', format: 'uuid', example: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' },
+          published: { type: 'boolean', example: false, description: 'Opcional. Por defecto es false.' },
         },
       },
       PostUpdate: {
         type: 'object',
+        required: ['title', 'content'],
         properties: {
           title: { type: 'string', example: 'Título actualizado' },
           content: { type: 'string', example: 'Contenido actualizado.' },

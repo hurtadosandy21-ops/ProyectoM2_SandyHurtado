@@ -16,7 +16,7 @@ const postService = {
   // Obtener posts de un autor específico con información del autor
   async getByAuthorId(authorId) {
     const query = `
-      SELECT p.*, json_build_object('id', a.id, 'name', a.name, 'email', a.email) as author
+      SELECT p.*, json_build_object('id', a.id, 'name', a.name, 'email', a.email) AS author
       FROM posts p
       JOIN authors a ON p.author_id = a.id
       WHERE p.author_id = $1
@@ -26,24 +26,28 @@ const postService = {
     return result.rows;
   },
 
-   // Crear un nuevo post
+  // Crear un nuevo post
   async create(author_id, title, content, published) {
-   // Sin try/catch aquí para que el error original de Postgres suba intacto
-    const query = 'INSERT INTO posts (author_id, title, content, published) VALUES ($1, $2, $3, $4) RETURNING *';
+    // Sin try/catch aquí para que el error original de Postgres suba intacto
+    const query =
+      'INSERT INTO posts (author_id, title, content, published) VALUES ($1, $2, $3, $4) RETURNING *';
     const values = [author_id, title, content, published ?? false];
     const result = await pool.query(query, values);
     return result.rows[0];
   },
 
   // Actualizar un post
+  // COALESCE: si published llega como null, se conserva el valor que ya tenía
   async update(id, title, content, published) {
     const query = `
-      UPDATE posts 
-      SET title = $1, content = $2, published = $3 
-      WHERE id = $4 
+      UPDATE posts
+      SET title = $1,
+          content = $2,
+          published = COALESCE($3, published)
+      WHERE id = $4
       RETURNING *;
     `;
-    const values = [title, content, published, id];
+    const values = [title, content, published ?? null, id];
     const result = await pool.query(query, values);
     return result.rows[0];
   },
@@ -52,7 +56,7 @@ const postService = {
   async remove(id) {
     const result = await pool.query('DELETE FROM posts WHERE id = $1 RETURNING *', [id]);
     return result.rows[0];
-  }
+  },
 };
 
 module.exports = postService;
