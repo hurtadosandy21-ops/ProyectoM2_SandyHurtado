@@ -1,11 +1,11 @@
 const express = require('express');
 const cors = require('cors');
-const { swaggerUi, specs } = require('./desarrollo/src/config/swagger');
-const authorRoutes = require('./desarrollo/src/routes/authorRoutes');
-const postRoutes = require('./desarrollo/src/routes/postRoutes');
+const { swaggerUi, specs } = require('./src/config/swagger');
+const authorRoutes = require('./src/routes/authorRoutes');
+const postRoutes = require('./src/routes/postRoutes');
 
 // Importar el middleware de errores
-const errorHandler = require('./desarrollo/src/middlewares/errorHandler');
+const errorHandler = require('./src/middlewares/errorHandler');
 
 const app = express();
 
