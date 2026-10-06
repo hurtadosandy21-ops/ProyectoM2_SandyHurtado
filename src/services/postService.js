@@ -3,7 +3,8 @@ const pool = require('../config/db');
 const postService = {
   // Obtener todos los posts
   async getAll() {
-    const result = await pool.query('SELECT * FROM posts ORDER BY id ASC');
+    // en getAll()
+    const result = await pool.query('SELECT * FROM posts ORDER BY created_at ASC');
     return result.rows;
   },
 
