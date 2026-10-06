@@ -43,12 +43,12 @@ const authorController = {
       const newAuthor = await authorService.create(name, email, bio);
       res.status(201).json(newAuthor);
     } catch (error) {
-      // Código PostgreSQL para violación de restricción única (ej. email duplicado)
-      if (error.code === '23505') {
-        return res.status(400).json({ error: 'El email ya está registrado' });
-      }
-      res.status(500).json({ error: 'Error al crear el autor' });
+     console.error('Error en createAuthor:', error); // <- agrega esto
+     if (error.code === '23505') {
+     return res.status(400).json({ error: 'El email ya está registrado' });
     }
+  res.status(500).json({ error: 'Error al crear el autor' });
+}
   },
 
   // PUT /authors/:id

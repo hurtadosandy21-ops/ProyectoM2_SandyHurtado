@@ -3,6 +3,7 @@ require('dotenv').config();
 
 // Creamos el Pool asegurando que la contraseña sea un string válido
 const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD ? String(process.env.DB_PASSWORD) : '1106',

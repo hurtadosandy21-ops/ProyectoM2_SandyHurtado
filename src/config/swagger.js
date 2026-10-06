@@ -1,5 +1,6 @@
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
+const swaggerComponents = require('./swaggerComponents'); // 👈 nuevo
 
 const options = {
   definition: {
@@ -10,18 +11,18 @@ const options = {
       description: 'API desarrollada con Node.js, Express y PostgreSQL',
     },
     servers: [
-     {
-      url: '/',
-     description: 'Servidor actual'
-     },
+      {
+        url: '/',
+        description: 'Servidor actual',
+      },
     ],
+    ...swaggerComponents, // 👈 nuevo: agrega tags y components
   },
   apis: ['./src/routes/*.js'],
 };
 
 const specs = swaggerJsdoc(options);
 
-// ¡CRÍTICO!: Asegúrate de exportar ambos objetos aquí
 module.exports = {
   swaggerUi,
   specs,

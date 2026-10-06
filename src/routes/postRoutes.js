@@ -2,27 +2,44 @@ const express = require('express');
 const router = express.Router();
 const postController = require('../controllers/postController');
 
+// Orden pensado para el flujo lógico en Swagger:
+// crear → listar → posts de un autor → ver uno → actualizar → eliminar
+//
+// IMPORTANTE: '/author/:authorId' debe ir ANTES de '/:id'.
+// Si fuera después, Express tomaría la palabra "author" como si fuera un id.
+
 /**
  * @swagger
- * /posts/author/{authorId}:
- *   get:
- *     summary: Obtiene todos los posts de un autor específico
+ * /posts:
+ *   post:
+ *     summary: Crea un nuevo post
  *     tags: ["Posts"]
- *     parameters:
- *       - in: path
- *         name: authorId
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *         description: El ID único del autor
+ *     description: Crea un post asociado a un autor que ya exista.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/PostInput'
  *     responses:
- *       200:
- *         description: Lista de posts del autor obtenida con éxito.
+ *       201:
+ *         description: Post creado con éxito.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Post'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
  *       404:
- *         description: Autor no encontrado.
+ *         description: El autor indicado en author_id no existe.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
  */
-router.get('/author/:authorId', postController.getPostsByAuthor);
+router.post('/', postController.createPost);
 
 /**
  * @swagger
@@ -33,8 +50,46 @@ router.get('/author/:authorId', postController.getPostsByAuthor);
  *     responses:
  *       200:
  *         description: Lista de posts obtenida con éxito.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Post'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get('/', postController.getAllPosts);
+
+/**
+ * @swagger
+ * /posts/author/{authorId}:
+ *   get:
+ *     summary: Obtiene todos los posts de un autor específico
+ *     tags: ["Posts"]
+ *     parameters:
+ *       - $ref: '#/components/parameters/PostAuthorId'
+ *     responses:
+ *       200:
+ *         description: Lista de posts del autor obtenida con éxito.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Post'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       404:
+ *         description: Autor no encontrado.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get('/author/:authorId', postController.getPostsByAuthor);
 
 /**
  * @swagger
@@ -43,54 +98,22 @@ router.get('/', postController.getAllPosts);
  *     summary: Obtiene el detalle de un post por su ID
  *     tags: ["Posts"]
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
+ *       - $ref: '#/components/parameters/PostId'
  *     responses:
  *       200:
  *         description: Post encontrado.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Post'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
  *       404:
- *         description: Post no encontrado.
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get('/:id', postController.getPostById);
-
-/**
- * @swagger
- * /posts:
- *   post:
- *     summary: Crea un nuevo post
- *     tags: ["Posts"]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - title
- *               - content
- *               - author_id
- *             properties:
- *               title:
- *                 type: string
- *                 example: "Mi primer post en MiniBlog"
- *               content:
- *                 type: string
- *                 example: "Contenido interesante de desarrollo web."
- *               author_id:
- *                 type: string
- *                 format: uuid
- *                 example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
- *     responses:
- *       201:
- *         description: Post creado con éxito.
- *       400:
- *         description: Faltan campos obligatorios.
- */
-router.post('/', postController.createPost);
 
 /**
  * @swagger
@@ -98,31 +121,28 @@ router.post('/', postController.createPost);
  *   put:
  *     summary: Actualiza un post existente
  *     tags: ["Posts"]
+ *     description: Envía solo los campos que quieras cambiar (title, content y/o published).
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
+ *       - $ref: '#/components/parameters/PostId'
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               title:
- *                 type: string
- *               content:
- *                 type: string
- *               published:
- *                 type: boolean
+ *             $ref: '#/components/schemas/PostUpdate'
  *     responses:
  *       200:
  *         description: Post actualizado.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Post'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
  *       404:
- *         description: Post no encontrado.
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
  */
 router.put('/:id', postController.updatePost);
 
@@ -133,17 +153,16 @@ router.put('/:id', postController.updatePost);
  *     summary: Elimina un post
  *     tags: ["Posts"]
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
+ *       - $ref: '#/components/parameters/PostId'
  *     responses:
  *       200:
  *         description: Post eliminado correctamente.
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
  *       404:
- *         description: Post no encontrado.
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
  */
 router.delete('/:id', postController.deletePost);
 
