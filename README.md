@@ -8,9 +8,6 @@ API RESTful desarrollada con **Node.js**, **Express** y **PostgreSQL** para la g
 Este proyecto implementa el backend para un sistema de blog minimalista. Cuenta con una arquitectura limpia basada en servicios y controladores, validaciones de datos, manejo de errores optimizado, documentación interactiva mediante **OpenAPI (Swagger)** y soporte para despliegue en la nube con **Railway**.
 
 ---
-## Información detallada de: 
-
-- [Uso de IA](/documentacion/IA.md)
 
 ### 🔗 Enlaces del Proyecto
 
@@ -89,46 +86,66 @@ Para ejecutar las pruebas automatizadas del proyecto (si aplica), utiliza el sig
 npm test
 ```
 
-**📄 Documentación OpenAPI / Swagger UI**
+#### 📄 Documentación OpenAPI / Swagger UI
 
-La documentación interactiva de la API está integrada mediante Swagger.
+La documentación de la API está integrada de forma interactiva mediante **Swagger UI** y estandarizada bajo la especificación **OpenAPI**. Esta interfaz gráfica permite explorar, comprender y probar en tiempo real todos los endpoints del MiniBlog (autores y publicaciones), detallando los métodos HTTP (`GET`, `POST`, `PUT`, `DELETE`), los esquemas de datos, los parámetros requeridos (como los identificadores UUID) y los códigos de respuesta.
 
-En entorno local: Una vez que tu servidor esté encendido, abre en tu navegador.
- 
- Ejemplo de link :
+#### 🔍 ¿Qué ofrece esta documentación interactiva?
+* **Visualización de Contratos:** Muestra claramente la estructura exacta en formato JSON que espera recibir cada ruta y lo que devolverá como respuesta.
+* **Función "Try it out":** Permite ejecutar peticiones directamente desde el navegador web para probar la API sin necesidad de usar herramientas externas como Postman o cURL.
+* **Esquemas de Modelos (Schemas):** Detalla el diccionario de datos estructural de los recursos principales (`Author` y `Post`) y sus restricciones obligatorias.
 
-`http://localhost:8080/api-docs`
+---
 
-En producción (Railway):
+#### 🔗 Enlaces de Acceso y Ejemplos
 
-Ejemplo de link :
+Dependiendo de dónde se esté ejecutando el proyecto, la interfaz de la documentación estará disponible a través de las siguientes rutas:
 
-`https://tu-proyecto.up.railway.app/api-docs`
+* **En entorno local (Desarrollo):**
+  Una vez que enciendas tu servidor en tu computadora, la estructura del enlace generado será similar a esta:
+  `http://localhost:3000/api-docs` *(Ejemplo de referencia local)*
 
+* **En producción (Railway):**
+  Una vez completado el despliegue en la nube, la plataforma te asignará un dominio público donde podrás consultar la documentación en vivo:
+  `https://tu-proyecto.up.railway.app/api-docs` *(Ejemplo de URL pública en producción)*
 
-## ☁️ Guía de Deployment en Railway
-Para desplegar este proyecto en producción usando Railway, sigue estos pasos:
+## 5. ☁️ Guía de Deployment en Railway
 
-### 1.Conectar el repositorio: 
-Sube tu código a un repositorio público o privado en GitHub. Entra a Railway, crea un nuevo proyecto seleccionando Deploy from GitHub repo y elige tu repositorio.
+Para desplegar este proyecto en producción utilizando **Railway**, sigue estos pasos:
 
-### 2.Agregar la Base de Datos PostgreSQL:
- Dentro de tu proyecto en Railway, añade un servicio complementario de PostgreSQL.
+###  Conectar el repositorio: 
 
-### 3.Configurar las Variables de Entorno (Environment Variables):
-Railway enlazará automáticamente las variables de tu base de datos si utilizas las referencias internas, o puedes configurarlas manualmente en la pestaña Variables:
+1. **Sube tu código a GitHub.**
+Entra a [Railway](https://railway.app/), crea un nuevo proyecto seleccionando *Deploy from GitHub repo* y vincula tu repositorio.
+2. **Añadir Base de Datos:** Agrega un servicio complementario de **PostgreSQL** dentro del mismo proyecto en Railway.
+3. **Vincular Servicios y Variables de Entorno:**
+   Railway facilita la conexión mediante una única variable unificada:
+   * **`DATABASE_URL`**: Railway genera automáticamente esta cadena de conexión cuando vinculas tu servicio de Node.js con la base de datos de PostgreSQL. Asegúrate de que tu aplicación lea esta variable en lugar de credenciales individuales.
+   * **`PORT`**: Railway lo asigna de forma dinámica, por lo que tu servidor debe configurarse usando `process.env.PORT`.
 
-**PORT** (Railway lo asigna de forma dinámica, asegúrate de usar process.env.PORT en tu código).
+> 💡 **Consejo de configuración en el código:** Para que tu aplicación reconozca esta variable tanto en local (si decides usar una URL de conexión) como en producción, puedes configurar tu `Pool` de PostgreSQL en Node.js de la siguiente manera:
+> ```javascript
+> const { Pool } = require('pg');
+> 
+> const pool = new Pool({
+>   connectionString: process.env.DATABASE_URL,
+>   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+> });
+> ```
 
-**DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT** (puedes usar las credenciales que provee el plugin de PostgreSQL en Railway).
+> 📌 **Nota sobre la implementación:** Esta es la forma en la que se configuró y estructuró este proyecto específico utilizando una URL de conexión unificada (`DATABASE_URL`). Sin embargo, ten en cuenta que existen otras opciones válidas de configuración en la plataforma (como el uso de variables separadas para host, usuario, contraseña, puerto y nombre de base de datos) según las preferencias de arquitectura de cada desarrollador.
 
-### Internal URL vs Public URL:
+### 6. Diferencia clave entre URLs:
+   * **Internal URL (Red Interna):** Es la dirección privada que utiliza Railway para que tu servicio Node.js y PostgreSQL se comuniquen de forma ultrarrápida y segura dentro del mismo clúster en la nube.
+   * **Public URL (Dominio Público):** Es el enlace web público generado por Railway (ej. `https://miniblog-production.up.railway.app`) que permite a los usuarios externos y evaluadores acceder a la API y a la interfaz de Swagger desde internet.
+
+### 7. Internal URL vs Public URL:
 
 **Internal URL**: Es la dirección de red privada que provee Railway para que tu servicio Node.js se comunique con la base de datos PostgreSQL de forma rápida y segura dentro del mismo clúster.
 
-**Public URL**: Es el dominio web público generado por Railway (ej. https://miniblog-production.up.railway.app) que permite a los usuarios externos y colaboradores acceder a la API y a la documentación de Swagger desde internet.
+**Public URL**: Es el dominio web público generado por Railway (ej. `https://miniblog-production.up.railway.app`) que permite a los usuarios externos y colaboradores acceder a la API y a la documentación de Swagger desde internet.
 
-## 🤖 Registro del Uso de Inteligencia Artificial (AI) en el Proyecto
+## 8. 🤖 Registro del Uso de Inteligencia Artificial (AI) en el Proyecto
 
 Durante el desarrollo de esta API, se utilizó asistencia de Inteligencia Artificial (IA) como herramienta colaborativa para los siguientes propósitos:
 
@@ -139,3 +156,7 @@ Optimización de consultas SQL: Implementación de la cláusula RETURNING * en l
 Depuración de errores: Resolución de bloqueos de servicios locales en Windows y errores de conexión a PostgreSQL (Connection refused).
 
 Documentación: Estructuración y redacción de las especificaciones OpenAPI/Swagger y el presente archivo README.
+
+## Información más detallada del: 
+
+- [Uso de IA](/documentacion/IA.md)
