@@ -1,0 +1,684 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "MiniBlog API",
+    "version": "1.0.0",
+    "description": "API desarrollada con Node.js, Express y PostgreSQL"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Servidor actual"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Autores",
+      "description": "Gestión de autores"
+    },
+    {
+      "name": "Posts",
+      "description": "Gestión de posts"
+    }
+  ],
+  "components": {
+    "schemas": {
+      "Author": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+          },
+          "name": {
+            "type": "string",
+            "example": "Sandy Hurtado"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "sandy@example.com"
+          },
+          "bio": {
+            "type": "string",
+            "nullable": true,
+            "example": "Desarrolladora Full Stack"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-10-06T21:55:43.381Z"
+          }
+        }
+      },
+      "AuthorInput": {
+        "type": "object",
+        "required": [
+          "name",
+          "email"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Sandy Hurtado"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "sandy@example.com"
+          },
+          "bio": {
+            "type": "string",
+            "example": "Desarrolladora Full Stack"
+          }
+        }
+      },
+      "AuthorUpdate": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Sandy Hurtado"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "sandy@example.com"
+          },
+          "bio": {
+            "type": "string",
+            "example": "Desarrolladora Full Stack"
+          }
+        }
+      },
+      "Post": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "b7c9e2a1-3d4f-4a6b-8c5d-1e2f3a4b5c6d"
+          },
+          "title": {
+            "type": "string",
+            "example": "Mi primer post en MiniBlog"
+          },
+          "content": {
+            "type": "string",
+            "example": "Contenido interesante de desarrollo web."
+          },
+          "author_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+          },
+          "published": {
+            "type": "boolean",
+            "example": false
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-10-06T21:55:43.381Z"
+          }
+        }
+      },
+      "PostWithAuthor": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Post"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "author": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+                  },
+                  "name": {
+                    "type": "string",
+                    "example": "Sandy Hurtado"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "sandy@example.com"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "PostInput": {
+        "type": "object",
+        "required": [
+          "title",
+          "content",
+          "author_id"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Mi primer post en MiniBlog"
+          },
+          "content": {
+            "type": "string",
+            "example": "Contenido interesante de desarrollo web."
+          },
+          "author_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+          },
+          "published": {
+            "type": "boolean",
+            "example": false,
+            "description": "Opcional. Por defecto es false."
+          }
+        }
+      },
+      "PostUpdate": {
+        "type": "object",
+        "required": [
+          "title",
+          "content"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Título actualizado"
+          },
+          "content": {
+            "type": "string",
+            "example": "Contenido actualizado."
+          },
+          "published": {
+            "type": "boolean",
+            "example": true
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "Descripción del error"
+          }
+        }
+      }
+    },
+    "parameters": {
+      "AuthorId": {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "description": "ID único del autor"
+      },
+      "PostId": {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "description": "ID único del post"
+      },
+      "PostAuthorId": {
+        "in": "path",
+        "name": "authorId",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "description": "ID único del autor"
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Datos inválidos, campos obligatorios faltantes o ID con formato incorrecto.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Recurso no encontrado.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Ya existe un autor con ese email.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "Error interno del servidor.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/posts": {
+      "post": {
+        "summary": "Crea un nuevo post",
+        "tags": [
+          "Posts"
+        ],
+        "description": "Crea un post asociado a un autor que ya exista.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Post creado con éxito.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "description": "El autor indicado en author_id no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "get": {
+        "summary": "Obtiene la lista de todos los posts",
+        "tags": [
+          "Posts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de posts obtenida con éxito.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Post"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/posts/author/{authorId}": {
+      "get": {
+        "summary": "Obtiene todos los posts de un autor específico",
+        "tags": [
+          "Posts"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PostAuthorId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de posts del autor obtenida con éxito.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PostWithAuthor"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "description": "Autor no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/posts/{id}": {
+      "get": {
+        "summary": "Obtiene el detalle de un post por su ID",
+        "tags": [
+          "Posts"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PostId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Post encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "put": {
+        "summary": "Actualiza un post existente",
+        "tags": [
+          "Posts"
+        ],
+        "description": "Envía solo los campos que quieras cambiar (title, content y/o published).",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PostId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Post actualizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Elimina un post",
+        "tags": [
+          "Posts"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PostId"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Post eliminado correctamente (sin contenido)."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/authors": {
+      "get": {
+        "summary": "Obtiene la lista de todos los autores",
+        "tags": [
+          "Autores"
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de autores obtenida exitosamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Author"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "post": {
+        "summary": "Crea un nuevo autor",
+        "tags": [
+          "Autores"
+        ],
+        "description": "Registra un autor validando que el nombre no esté vacío y que el email tenga formato válido y sea único. El email se guarda en minúsculas.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthorInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Autor creado exitosamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Author"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/authors/{id}": {
+      "get": {
+        "summary": "Obtiene el detalle de un autor por su ID",
+        "tags": [
+          "Autores"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AuthorId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Autor encontrado exitosamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Author"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "put": {
+        "summary": "Actualiza un autor existente",
+        "tags": [
+          "Autores"
+        ],
+        "description": "name es obligatorio; email y bio son opcionales (si no se envían, se conservan).",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AuthorId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthorUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Autor actualizado correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Author"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Elimina un autor",
+        "tags": [
+          "Autores"
+        ],
+        "description": "Elimina el autor y, por ON DELETE CASCADE, también todos sus posts.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AuthorId"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Autor eliminado correctamente (sin contenido)."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    }
+  }
+}

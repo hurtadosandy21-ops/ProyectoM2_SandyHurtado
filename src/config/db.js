@@ -1,24 +1,23 @@
 const { Pool } = require('pg');
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 
-// Creamos el Pool asegurando que la contraseña sea un string válido
+const connection = process.env.DATABASE_URL
+  ? { connectionString: process.env.DATABASE_URL }
+  : {
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 5432,
+    };
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD ? String(process.env.DB_PASSWORD) : '1106',
-  database: process.env.DB_NAME || 'blog_db',
-  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 5432,
+  ...connection,
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
 });
 
-// Prueba rápida de conexión al iniciar
-pool.connect((err, client, release) => {
-  if (err) {
-    console.error('❌ Error al conectar a la base de datos PostgreSQL:', err.stack);
-  } else {
-    console.log('✅ Conectado exitosamente a la base de datos PostgreSQL');
-    release();
-  }
+pool.on('error', (err) => {
+  console.error('❌ Error inesperado en el Pool de PostgreSQL:', err.message);
 });
 
 module.exports = pool;

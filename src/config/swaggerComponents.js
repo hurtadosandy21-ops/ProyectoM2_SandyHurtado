@@ -22,7 +22,8 @@ module.exports = {
           id: { type: 'string', format: 'uuid', example: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' },
           name: { type: 'string', example: 'Sandy Hurtado' },
           email: { type: 'string', format: 'email', example: 'sandy@example.com' },
-          bio: { type: 'string', example: 'Desarrolladora Full Stack' },
+          bio: { type: 'string', nullable: true, example: 'Desarrolladora Full Stack' },
+          created_at: { type: 'string', format: 'date-time', example: '2026-10-06T21:55:43.381Z' },
         },
       },
       AuthorInput: {
@@ -51,6 +52,7 @@ module.exports = {
           content: { type: 'string', example: 'Contenido interesante de desarrollo web.' },
           author_id: { type: 'string', format: 'uuid', example: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' },
           published: { type: 'boolean', example: false },
+          created_at: { type: 'string', format: 'date-time', example: '2026-10-06T21:55:43.381Z' },
         },
       },
       PostWithAuthor: {

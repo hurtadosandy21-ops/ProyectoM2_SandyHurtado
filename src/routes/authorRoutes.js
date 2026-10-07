@@ -16,24 +16,11 @@ const authorController = require('../controllers/authorController');
  *             schema:
  *               type: array
  *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: string
- *                     format: uuid
- *                     example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
- *                   name:
- *                     type: string
- *                     example: "Sandy Hurtado"
- *                   email:
- *                     type: string
- *                     example: "sandy@example.com"
- *                   bio:
- *                     type: string
- *                     example: "Desarrolladora Full Stack"
+ *                 $ref: '#/components/schemas/Author'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get('/', authorController.getAllAuthors);
-
 
 /**
  * @swagger
@@ -42,18 +29,20 @@ router.get('/', authorController.getAllAuthors);
  *     summary: Obtiene el detalle de un autor por su ID
  *     tags: ["Autores"]
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *         description: ID único del autor
+ *       - $ref: '#/components/parameters/AuthorId'
  *     responses:
  *       200:
  *         description: Autor encontrado exitosamente.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Author'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
  *       404:
- *         description: Autor no encontrado.
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get('/:id', authorController.getAuthorById);
 
@@ -63,49 +52,26 @@ router.get('/:id', authorController.getAuthorById);
  *   post:
  *     summary: Crea un nuevo autor
  *     tags: ["Autores"]
- *     description: Registra un autor validando que el nombre no esté vacío y el email sea único.
+ *     description: Registra un autor validando que el nombre no esté vacío y que el email tenga formato válido y sea único. El email se guarda en minúsculas.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - name
- *               - email
- *             properties:
- *               name:
- *                 type: string
- *                 example: "Sandy Hurtado"
- *               email:
- *                 type: string
- *                 example: "Sandy@example.com"
- *               bio:
- *                 type: string
- *                 example: "Desarrolladora Full Stack 79"
+ *             $ref: '#/components/schemas/AuthorInput'
  *     responses:
  *       201:
  *         description: Autor creado exitosamente.
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 id:
- *                   type: string
- *                   format: uuid
- *                   example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
- *                 name:
- *                   type: string
- *                   example: "Sandy Hurtado"
- *                 email:
- *                   type: string
- *                   example: "Sandy@example.com"
- *                 bio:
- *                   type: string
- *                   example: "Desarrolladora Full Stack 79"
+ *               $ref: '#/components/schemas/Author'
  *       400:
- *         description: Datos inválidos o email duplicado.
+ *         $ref: '#/components/responses/BadRequest'
+ *       409:
+ *         $ref: '#/components/responses/Conflict'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
  */
 router.post('/', authorController.createAuthor);
 
@@ -115,31 +81,30 @@ router.post('/', authorController.createAuthor);
  *   put:
  *     summary: Actualiza un autor existente
  *     tags: ["Autores"]
+ *     description: name es obligatorio; email y bio son opcionales (si no se envían, se conservan).
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
+ *       - $ref: '#/components/parameters/AuthorId'
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *               email:
- *                 type: string
- *               bio:
- *                 type: string
+ *             $ref: '#/components/schemas/AuthorUpdate'
  *     responses:
  *       200:
  *         description: Autor actualizado correctamente.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Author'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
  *       404:
- *         description: Autor no encontrado.
+ *         $ref: '#/components/responses/NotFound'
+ *       409:
+ *         $ref: '#/components/responses/Conflict'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
  */
 router.put('/:id', authorController.updateAuthor);
 
@@ -149,18 +114,18 @@ router.put('/:id', authorController.updateAuthor);
  *   delete:
  *     summary: Elimina un autor
  *     tags: ["Autores"]
+ *     description: Elimina el autor y, por ON DELETE CASCADE, también todos sus posts.
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
+ *       - $ref: '#/components/parameters/AuthorId'
  *     responses:
- *       200:
- *         description: Autor eliminado correctamente.
+ *       204:
+ *         description: Autor eliminado correctamente (sin contenido).
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
  *       404:
- *         description: Autor no encontrado.
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
  */
 router.delete('/:id', authorController.deleteAuthor);
 

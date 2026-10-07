@@ -3,7 +3,7 @@ const pool = require('../config/db');
 const authorService = {
   // Obtener todos los autores
   async getAll() {
-    const result = await pool.query('SELECT * FROM authors ORDER BY id ASC');
+    const result = await pool.query('SELECT * FROM authors ORDER BY created_at ASC');
     return result.rows;
   },
 

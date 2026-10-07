@@ -1,3 +1,4 @@
+const path = require('path');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const swaggerComponents = require('./swaggerComponents'); // 👈 nuevo
@@ -18,7 +19,7 @@ const options = {
     ],
     ...swaggerComponents, // 👈 nuevo: agrega tags y components
   },
-  apis: ['./src/routes/*.js'],
+  apis: [path.join(__dirname, '..', 'routes', '*.js')],
 };
 
 const specs = swaggerJsdoc(options);

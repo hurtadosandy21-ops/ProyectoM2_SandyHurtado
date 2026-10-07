@@ -77,7 +77,7 @@ router.get('/', postController.getAllPosts);
  *             schema:
  *               type: array
  *               items:
- *                 $ref: '#/components/schemas/Post'
+ *                 $ref: '#/components/schemas/PostWithAuthor'
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       404:
@@ -155,8 +155,8 @@ router.put('/:id', postController.updatePost);
  *     parameters:
  *       - $ref: '#/components/parameters/PostId'
  *     responses:
- *       200:
- *         description: Post eliminado correctamente.
+ *       204:
+ *         description: Post eliminado correctamente (sin contenido).
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       404:

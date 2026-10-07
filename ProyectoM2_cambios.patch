@@ -1,0 +1,1984 @@
+diff --git a/.env.example b/.env.example
+index fdce0db..1a74d2f 100644
+--- a/.env.example
++++ b/.env.example
+@@ -1,8 +1,9 @@
+-PORT=3000
+-DATABASE_URL=postgresql://postgres:tu-contraseña-aqui@localhost:5432/blog_db
++PORT=8080
++DATABASE_URL=postgresql://postgres:tu_contraseña_aqui@localhost:5432/blog_db
++DB_SSL=false
+ NODE_ENV=development
+ DB_HOST=localhost
+ DB_USER=tu_usuario_aqui
+ DB_PASSWORD=tu_contraseña_aqui
+ DB_NAME=blog_db
+-DB_PORT=5432
+\ No newline at end of file
++DB_PORT=5432
+diff --git a/README.md b/README.md
+index 9de8b9f..b32abdb 100644
+--- a/README.md
++++ b/README.md
+@@ -1,162 +1,238 @@
+ # 🚀 MiniBlog API - DevSpark
+ 
+-API RESTful desarrollada con **Node.js**, **Express** y **PostgreSQL** para la gestión de un MiniBlog. Permite administrar autores y publicaciones (posts) utilizando identificadores únicos universales (**UUIDs**) generados por la base de datos.
++API REST desarrollada con **Node.js**, **Express 5** y **PostgreSQL** para gestionar un MiniBlog: autores (`authors`) y publicaciones (`posts`) con una relación **1:N** (un autor tiene muchos posts). Los identificadores son **UUID** generados por la base de datos.
+ 
+ ---
+ 
+-## 📋 Descripción del Proyecto
+-Este proyecto implementa el backend para un sistema de blog minimalista. Cuenta con una arquitectura limpia basada en servicios y controladores, validaciones de datos, manejo de errores optimizado, documentación interactiva mediante **OpenAPI (Swagger)** y soporte para despliegue en la nube con **Railway**.
++## 🔗 Enlaces del proyecto
++
++| Recurso | URL |
++|---|---|
++| API en producción (Railway) | https://proyectom2sandyhurtado-production.up.railway.app/ |
++| Swagger UI (producción) | https://proyectom2sandyhurtado-production.up.railway.app/api-docs |
++| Especificación OpenAPI 3.0 | [`openapi.json`](openapi.json) |
++| Repositorio | https://github.com/hurtadosandy21-ops/ProyectoM2_SandyHurtado |
+ 
+ ---
+ 
+-### 🔗 Enlaces del Proyecto
++## 📁 Estructura
+ 
+-- **Swagger:** [Abrir Swagger](https://proyectom2sandyhurtado-production.up.railway.app/api-docs)
++```
++├── app.js                     # Configura Express: middlewares, rutas, 404 y manejador de errores
++├── server.js                  # Arranca el servidor (app.listen)
++├── setup.js                   # Crea la base de datos, aplica el schema y (opcional) el seed
++├── openapi.json               # Especificación OpenAPI generada (npm run docs:openapi)
++├── db/
++│   ├── schema.sql             # Tablas, PK, FK, UNIQUE, NOT NULL, CHECK e índice
++│   └── seed.sql               # Datos de ejemplo
++├── scripts/export-openapi.js  # Exporta la especificación a openapi.json
++├── src/
++│   ├── config/                # Pool de PostgreSQL y configuración de Swagger
++│   ├── routes/                # Rutas + documentación @swagger
++│   ├── controllers/           # Validaciones y respuestas HTTP
++│   ├── services/              # Consultas SQL parametrizadas (lógica de datos)
++│   └── middlewares/           # Manejador global de errores
++└── test/api.test.js           # Tests de integración (Vitest + Supertest)
++```
+ 
+-- **Railway (Producción):** [Abrir Railway](https://proyectom2sandyhurtado-production.up.railway.app/)
++Flujo de una petición: **ruta → controlador (valida) → servicio (SQL con `$1, $2…`) → PostgreSQL**. Cualquier error se envía con `next(error)` al middleware global `errorHandler`.
+ 
+-## 🛠️ Requisitos y Pasos para Ejecutar Local
++---
+ 
+-### Prerrequisitos
+-* **Node.js** (versión 18 o superior recomendada).
+-* **PostgreSQL** (versión 16 instalada localmente o un servidor accesible).
++## 🗄️ Modelo de datos
+ 
+-### 1. Clonar el repositorio e instalar dependencias
+ ```
+-git clone <url-de-tu-repositorio>
+-cd nombre-de-tu-repositorio
+-npm install
++authors (1) ──────────< (N) posts
+ ```
+ 
+-### 2. Configurar las variables de entorno
+-Crea un archivo llamado .env en la raíz del proyecto basándote en el siguiente ejemplo:
++| Tabla | Columna | Tipo | Restricciones |
++|---|---|---|---|
++| authors | id | UUID | PK, `DEFAULT gen_random_uuid()` |
++| authors | name | VARCHAR(100) | NOT NULL, no vacío (CHECK) |
++| authors | email | VARCHAR(100) | NOT NULL, **UNIQUE** (se guarda en minúsculas) |
++| authors | bio | TEXT | opcional |
++| authors | created_at | TIMESTAMP | NOT NULL, `DEFAULT CURRENT_TIMESTAMP` |
++| posts | id | UUID | PK, `DEFAULT gen_random_uuid()` |
++| posts | author_id | UUID | NOT NULL, **FK → authors(id) ON DELETE CASCADE** |
++| posts | title | VARCHAR(200) | NOT NULL, no vacío (CHECK) |
++| posts | content | TEXT | NOT NULL, no vacío (CHECK) |
++| posts | published | BOOLEAN | NOT NULL, `DEFAULT FALSE` |
++| posts | created_at | TIMESTAMP | NOT NULL, `DEFAULT CURRENT_TIMESTAMP` |
++
++El script completo está en [`db/schema.sql`](db/schema.sql) y los datos de ejemplo en [`db/seed.sql`](db/seed.sql). Ambos son **idempotentes**: se pueden ejecutar varias veces sin borrar ni duplicar datos.
+ 
+-```
+-Fragmento de código
+-PORT=3000
+-DB_HOST=localhost
+-DB_USER=postgres
+-DB_PASSWORD=tu_contraseña
+-DB_NAME=miniblog_db
+-DB_PORT=5432
++---
+ 
+-```
++## 🛠️ Ejecutar en local
++
++### Prerrequisitos
+ 
+-### 3. Configurar la Base de Datos (Setup SQL)
++- **Node.js 20 o superior** (lo exige Vitest 5).
++- **PostgreSQL 13 o superior** corriendo en local (o accesible por red).
+ 
+-Abre tu cliente de PostgreSQL (como pgAdmin o la terminal psql) y ejecuta el siguiente script para crear las tablas con soporte para UUIDs:
++### 1. Clonar e instalar dependencias
+ 
++```bash
++git clone https://github.com/hurtadosandy21-ops/ProyectoM2_SandyHurtado.git
++cd ProyectoM2_SandyHurtado
++npm install
+ ```
+-SQL
+--- Borrar tablas anteriores si existen
+-DROP TABLE IF EXISTS posts;
+-DROP TABLE IF EXISTS authors;
+-
+--- Crear tabla authors con UUID automático
+-CREATE TABLE authors (
+-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-    name VARCHAR(100) NOT NULL,
+-    email VARCHAR(100) UNIQUE NOT NULL,
+-    bio TEXT,
+-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-);
+-
+--- Crear tabla posts con UUID automático y relación con authors
+-CREATE TABLE posts (
+-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-    author_id UUID REFERENCES authors(id) ON DELETE CASCADE,
+-    title VARCHAR(200) NOT NULL,
+-    content TEXT NOT NULL,
+-    published BOOLEAN DEFAULT FALSE,
+-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-);
++
++### 2. Variables de entorno
++
++Copia el archivo de ejemplo y edita la contraseña de tu PostgreSQL:
++
++```bash
++cp .env.example .env
+ ```
+ 
+-### 4. Ejecutar el servidor en modo desarrollo
++| Variable | Descripción | Ejemplo |
++|---|---|---|
++| `PORT` | Puerto del servidor (por defecto 8080) | `8080` |
++| `DATABASE_URL` | Cadena de conexión a PostgreSQL | `postgresql://postgres:tu_contraseña@localhost:5432/blog_db` |
++| `DB_SSL` | `true` solo si el servidor exige SSL | `false` |
++| `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_PORT` | Alternativa a `DATABASE_URL`: se usan solo si `DATABASE_URL` no está definida | `localhost`, `postgres`, `tu_contraseña`, `blog_db`, `5432` |
++| `NODE_ENV` | Entorno de ejecución | `development` |
++
++### 3. Crear la base de datos y las tablas
++
++```bash
++npm run db:setup
+ ```
+-npm run dev
+ 
+-El servidor estará corriendo en http://localhost:8080.
++Crea la base `blog_db` si no existe y aplica `db/schema.sql`. Para cargar además los datos de ejemplo:
++
++```bash
++npm run db:seed
+ ```
+-**🧪 Cómo Ejecutar Tests**
+ 
+-Para ejecutar las pruebas automatizadas del proyecto (si aplica), utiliza el siguiente comando:
++### 4. Levantar el servidor
+ 
++```bash
++npm run dev
+ ```
+-npm test
++
++La API queda en `http://localhost:8080` y Swagger en `http://localhost:8080/api-docs`.
++
++---
++
++## 📌 Endpoints
++
++Todas las respuestas son JSON. Los errores tienen la forma `{ "error": "mensaje" }`.
++
++### Authors
++
++| Método | Ruta | Descripción | Éxito | Errores |
++|---|---|---|---|---|
++| GET | `/authors` | Lista todos los autores | 200 | 500 |
++| GET | `/authors/:id` | Detalle de un autor | 200 | 400, 404 |
++| POST | `/authors` | Crea un autor (`name`, `email` obligatorios; `bio` opcional) | 201 | 400, 409 |
++| PUT | `/authors/:id` | Actualiza un autor (`name` obligatorio; `email`, `bio` opcionales) | 200 | 400, 404, 409 |
++| DELETE | `/authors/:id` | Elimina un autor y sus posts (CASCADE) | 204 | 400, 404 |
++
++### Posts
++
++| Método | Ruta | Descripción | Éxito | Errores |
++|---|---|---|---|---|
++| GET | `/posts` | Lista todos los posts | 200 | 500 |
++| GET | `/posts/:id` | Detalle de un post | 200 | 400, 404 |
++| GET | `/posts/author/:authorId` | Posts de un autor (incluye datos del autor) | 200 | 400, 404 |
++| POST | `/posts` | Crea un post (`title`, `content`, `author_id` obligatorios; `published` opcional) | 201 | 400, 404 |
++| PUT | `/posts/:id` | Actualiza un post (`title`, `content` obligatorios; `published` opcional) | 200 | 400, 404 |
++| DELETE | `/posts/:id` | Elimina un post | 204 | 400, 404 |
++
++### Ejemplos
++
++```bash
++curl -X POST http://localhost:8080/authors \
++  -H "Content-Type: application/json" \
++  -d '{"name": "Sandy Hurtado", "email": "sandy@example.com", "bio": "Desarrolladora Full Stack"}'
+ ```
+ 
+-#### 📄 Documentación OpenAPI / Swagger UI
++```bash
++curl -X POST http://localhost:8080/posts \
++  -H "Content-Type: application/json" \
++  -d '{"title": "Mi primer post", "content": "Hola mundo", "author_id": "<uuid-del-autor>", "published": true}'
++```
+ 
+-La documentación de la API está integrada de forma interactiva mediante **Swagger UI** y estandarizada bajo la especificación **OpenAPI**. Esta interfaz gráfica permite explorar, comprender y probar en tiempo real todos los endpoints del MiniBlog (autores y publicaciones), detallando los métodos HTTP (`GET`, `POST`, `PUT`, `DELETE`), los esquemas de datos, los parámetros requeridos (como los identificadores UUID) y los códigos de respuesta.
++### Códigos de estado
+ 
+-#### 🔍 ¿Qué ofrece esta documentación interactiva?
+-* **Visualización de Contratos:** Muestra claramente la estructura exacta en formato JSON que espera recibir cada ruta y lo que devolverá como respuesta.
+-* **Función "Try it out":** Permite ejecutar peticiones directamente desde el navegador web para probar la API sin necesidad de usar herramientas externas como Postman o cURL.
+-* **Esquemas de Modelos (Schemas):** Detalla el diccionario de datos estructural de los recursos principales (`Author` y `Post`) y sus restricciones obligatorias.
++| Código | Cuándo |
++|---|---|
++| 200 | Lectura o actualización correcta |
++| 201 | Recurso creado |
++| 204 | Recurso eliminado (sin body) |
++| 400 | Campo obligatorio faltante, email/`published` inválido, ID que no es UUID, texto demasiado largo o JSON mal formado |
++| 404 | Autor/post inexistente, `author_id` inexistente o ruta desconocida |
++| 409 | El email ya está registrado (control de unicidad) |
++| 500 | Error inesperado del servidor |
+ 
+ ---
+ 
+-#### 🔗 Enlaces de Acceso y Ejemplos
++## 🧪 Tests
+ 
+-Dependiendo de dónde se esté ejecutando el proyecto, la interfaz de la documentación estará disponible a través de las siguientes rutas:
++Son **tests de integración**: llaman a la API real con Supertest y usan la base de datos real, así validan el comportamiento completo (incluidos el UNIQUE del email, la FK, el CASCADE y los errores de PostgreSQL). Por eso necesitan PostgreSQL levantado con el schema aplicado:
+ 
+-* **En entorno local (Desarrollo):**
+-  Una vez que enciendas tu servidor en tu computadora, la estructura del enlace generado será similar a esta:
+-  `http://localhost:3000/api-docs` *(Ejemplo de referencia local)*
++```bash
++npm run db:setup
++```
++
++```bash
++npm test
++```
+ 
+-* **En producción (Railway):**
+-  Una vez completado el despliegue en la nube, la plataforma te asignará un dominio público donde podrás consultar la documentación en vivo:
+-  `https://tu-proyecto.up.railway.app/api-docs` *(Ejemplo de URL pública en producción)*
++La suite (`test/api.test.js`) tiene **26 tests** que cubren el CRUD completo de authors y posts, `/posts/author/:authorId` y los casos de error (400, 404, 409, JSON mal formado y ruta inexistente). Cada test crea sus propios datos con emails únicos y al terminar los borra, así no ensucia la base.
+ 
+-## 5. ☁️ Guía de Deployment en Railway
++> 💡 Si quieres una base separada para tests, crea otra (p. ej. `blog_db_test`) y ejecuta los comandos con esa `DATABASE_URL`.
+ 
+-Para desplegar este proyecto en producción utilizando **Railway**, sigue estos pasos:
++---
+ 
+-###  Conectar el repositorio: 
++## 📄 Documentación OpenAPI / Swagger
+ 
+-1. **Sube tu código a GitHub.**
+-Entra a [Railway](https://railway.app/), crea un nuevo proyecto seleccionando *Deploy from GitHub repo* y vincula tu repositorio.
+-2. **Añadir Base de Datos:** Agrega un servicio complementario de **PostgreSQL** dentro del mismo proyecto en Railway.
+-3. **Vincular Servicios y Variables de Entorno:**
+-   Railway facilita la conexión mediante una única variable unificada:
+-   * **`DATABASE_URL`**: Railway genera automáticamente esta cadena de conexión cuando vinculas tu servicio de Node.js con la base de datos de PostgreSQL. Asegúrate de que tu aplicación lea esta variable en lugar de credenciales individuales.
+-   * **`PORT`**: Railway lo asigna de forma dinámica, por lo que tu servidor debe configurarse usando `process.env.PORT`.
++- **Swagger UI interactivo:** `/api-docs` (en local y en producción). Permite probar cada endpoint con *Try it out*.
++- **Archivo OpenAPI 3.0:** [`openapi.json`](openapi.json), en la raíz del repositorio. Se genera a partir de los comentarios `@swagger` de las rutas:
+ 
+-> 💡 **Consejo de configuración en el código:** Para que tu aplicación reconozca esta variable tanto en local (si decides usar una URL de conexión) como en producción, puedes configurar tu `Pool` de PostgreSQL en Node.js de la siguiente manera:
+-> ```javascript
+-> const { Pool } = require('pg');
+-> 
+-> const pool = new Pool({
+->   connectionString: process.env.DATABASE_URL,
+->   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+-> });
+-> ```
++```bash
++npm run docs:openapi
++```
+ 
+-> 📌 **Nota sobre la implementación:** Esta es la forma en la que se configuró y estructuró este proyecto específico utilizando una URL de conexión unificada (`DATABASE_URL`). Sin embargo, ten en cuenta que existen otras opciones válidas de configuración en la plataforma (como el uso de variables separadas para host, usuario, contraseña, puerto y nombre de base de datos) según las preferencias de arquitectura de cada desarrollador.
++Si cambias la documentación de alguna ruta, vuelve a ejecutar este comando para actualizar `openapi.json`.
+ 
+-### 6. Diferencia clave entre URLs:
+-   * **Internal URL (Red Interna):** Es la dirección privada que utiliza Railway para que tu servicio Node.js y PostgreSQL se comuniquen de forma ultrarrápida y segura dentro del mismo clúster en la nube.
+-   * **Public URL (Dominio Público):** Es el enlace web público generado por Railway (ej. `https://miniblog-production.up.railway.app`) que permite a los usuarios externos y evaluadores acceder a la API y a la interfaz de Swagger desde internet.
++---
+ 
+-### 7. Internal URL vs Public URL:
++## ☁️ Deploy en Railway
+ 
+-**Internal URL**: Es la dirección de red privada que provee Railway para que tu servicio Node.js se comunique con la base de datos PostgreSQL de forma rápida y segura dentro del mismo clúster.
++1. **Subir el código a GitHub.**
++2. En [Railway](https://railway.app/) crear un proyecto con **Deploy from GitHub repo** y elegir este repositorio.
++3. **Agregar PostgreSQL** al mismo proyecto (*New → Database → PostgreSQL*).
++4. **Variables del servicio Node.js** (*Variables*):
++   - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (referencia a la URL interna de la base).
++   - `NODE_ENV` = `production`.
++   - `PORT` lo asigna Railway automáticamente y el servidor lo lee con `process.env.PORT`.
++5. Railway ejecuta `npm install` y luego `npm start` (`node server.js`).
++6. **Crear las tablas en la base de Railway** (una sola vez, o después de cambiar el schema). Desde tu computadora, usando la URL **pública** de la base (`DATABASE_PUBLIC_URL` en Railway):
+ 
+-**Public URL**: Es el dominio web público generado por Railway (ej. `https://miniblog-production.up.railway.app`) que permite a los usuarios externos y colaboradores acceder a la API y a la documentación de Swagger desde internet.
++   ```bash
++   DATABASE_URL="<DATABASE_PUBLIC_URL de Railway>" npm run db:seed
++   ```
+ 
+-## 8. 🤖 Registro del Uso de Inteligencia Artificial (AI) en el Proyecto
++   Si la conexión pide SSL, agrega `DB_SSL=true` delante del comando.
++7. En *Settings → Networking* generar un dominio público y comprobar `/` y `/api-docs`.
+ 
+-Durante el desarrollo de esta API, se utilizó asistencia de Inteligencia Artificial (IA) como herramienta colaborativa para los siguientes propósitos:
++### Internal URL vs Public URL
+ 
+-Diseño de base de datos: Estructuración de esquemas relacionales utilizando extensiones nativas de PostgreSQL para la generación segura de UUIDs (gen_random_uuid()).
++- **Internal URL** (`DATABASE_URL`, `*.railway.internal`): red privada de Railway. La usa la API en producción para hablar con PostgreSQL; es más rápida y no está expuesta a internet.
++- **Public URL** (`DATABASE_PUBLIC_URL` y el dominio `*.up.railway.app`): acceso desde fuera de Railway. La de la base sirve para ejecutar `db:setup`/`db:seed` desde tu computadora; la del servicio es la que usan los usuarios y evaluadores para consumir la API y Swagger.
+ 
+-Optimización de consultas SQL: Implementación de la cláusula RETURNING * en las operaciones de inserción y actualización para garantizar que la API devuelva los identificadores generados en tiempo de ejecución.
++---
+ 
+-Depuración de errores: Resolución de bloqueos de servicios locales en Windows y errores de conexión a PostgreSQL (Connection refused).
++## 🤖 Uso de Inteligencia Artificial
+ 
+-Documentación: Estructuración y redacción de las especificaciones OpenAPI/Swagger y el presente archivo README.
++Durante el desarrollo se usó IA como herramienta de apoyo para:
+ 
+-## Información más detallada del: 
++- **Diseño de base de datos:** esquema relacional con UUID generados por PostgreSQL (`gen_random_uuid()`).
++- **Consultas SQL:** uso de `RETURNING *` para devolver el registro creado o actualizado.
++- **Depuración:** errores de conexión a PostgreSQL en Windows (*Connection refused*).
++- **Documentación:** especificación OpenAPI/Swagger y este README.
+ 
+-- [Uso de IA](/documentacion/IA.md)
++Más detalle en [documentacion/IA.md](documentacion/IA.md).
+diff --git a/db/schema.sql b/db/schema.sql
+new file mode 100644
+index 0000000..d3220c8
+--- /dev/null
++++ b/db/schema.sql
+@@ -0,0 +1,22 @@
++CREATE EXTENSION IF NOT EXISTS pgcrypto;
++
++CREATE TABLE IF NOT EXISTS authors (
++    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
++    name       VARCHAR(100) NOT NULL CHECK (char_length(trim(name)) > 0),
++    email      VARCHAR(100) NOT NULL UNIQUE,
++    bio        TEXT,
++    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
++);
++
++CREATE TABLE IF NOT EXISTS posts (
++    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
++    author_id  UUID NOT NULL REFERENCES authors(id) ON DELETE CASCADE,
++    title      VARCHAR(200) NOT NULL CHECK (char_length(trim(title)) > 0),
++    content    TEXT NOT NULL CHECK (char_length(trim(content)) > 0),
++    published  BOOLEAN NOT NULL DEFAULT FALSE,
++    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
++);
++
++ALTER TABLE posts ALTER COLUMN author_id SET NOT NULL;
++
++CREATE INDEX IF NOT EXISTS idx_posts_author_id ON posts(author_id);
+diff --git a/db/seed.sql b/db/seed.sql
+new file mode 100644
+index 0000000..6d073dc
+--- /dev/null
++++ b/db/seed.sql
+@@ -0,0 +1,17 @@
++INSERT INTO authors (name, email, bio) VALUES
++    ('Sandy Hurtado', 'sandy@example.com', 'Desarrolladora Full Stack'),
++    ('Carlos Pérez',  'carlos@example.com', 'Backend developer apasionado por PostgreSQL'),
++    ('Lucía Gómez',   'lucia@example.com',  NULL)
++ON CONFLICT (email) DO NOTHING;
++
++INSERT INTO posts (author_id, title, content, published)
++SELECT a.id, p.title, p.content, p.published
++FROM (VALUES
++    ('sandy@example.com',  'Mi primer post en MiniBlog', 'Bienvenidos a mi blog sobre desarrollo web.', TRUE),
++    ('sandy@example.com',  'Express + PostgreSQL',       'Cómo conectar Express con PostgreSQL usando Pool.', FALSE),
++    ('carlos@example.com', 'Constraints en SQL',         'PK, FK, UNIQUE y NOT NULL explicados con ejemplos.', TRUE)
++) AS p(email, title, content, published)
++JOIN authors a ON a.email = p.email
++WHERE NOT EXISTS (
++    SELECT 1 FROM posts x WHERE x.author_id = a.id AND x.title = p.title
++);
+diff --git a/openapi.json b/openapi.json
+new file mode 100644
+index 0000000..8a19151
+--- /dev/null
++++ b/openapi.json
+@@ -0,0 +1,684 @@
++{
++  "openapi": "3.0.0",
++  "info": {
++    "title": "MiniBlog API",
++    "version": "1.0.0",
++    "description": "API desarrollada con Node.js, Express y PostgreSQL"
++  },
++  "servers": [
++    {
++      "url": "/",
++      "description": "Servidor actual"
++    }
++  ],
++  "tags": [
++    {
++      "name": "Autores",
++      "description": "Gestión de autores"
++    },
++    {
++      "name": "Posts",
++      "description": "Gestión de posts"
++    }
++  ],
++  "components": {
++    "schemas": {
++      "Author": {
++        "type": "object",
++        "properties": {
++          "id": {
++            "type": "string",
++            "format": "uuid",
++            "example": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
++          },
++          "name": {
++            "type": "string",
++            "example": "Sandy Hurtado"
++          },
++          "email": {
++            "type": "string",
++            "format": "email",
++            "example": "sandy@example.com"
++          },
++          "bio": {
++            "type": "string",
++            "nullable": true,
++            "example": "Desarrolladora Full Stack"
++          },
++          "created_at": {
++            "type": "string",
++            "format": "date-time",
++            "example": "2026-10-06T21:55:43.381Z"
++          }
++        }
++      },
++      "AuthorInput": {
++        "type": "object",
++        "required": [
++          "name",
++          "email"
++        ],
++        "properties": {
++          "name": {
++            "type": "string",
++            "example": "Sandy Hurtado"
++          },
++          "email": {
++            "type": "string",
++            "format": "email",
++            "example": "sandy@example.com"
++          },
++          "bio": {
++            "type": "string",
++            "example": "Desarrolladora Full Stack"
++          }
++        }
++      },
++      "AuthorUpdate": {
++        "type": "object",
++        "required": [
++          "name"
++        ],
++        "properties": {
++          "name": {
++            "type": "string",
++            "example": "Sandy Hurtado"
++          },
++          "email": {
++            "type": "string",
++            "format": "email",
++            "example": "sandy@example.com"
++          },
++          "bio": {
++            "type": "string",
++            "example": "Desarrolladora Full Stack"
++          }
++        }
++      },
++      "Post": {
++        "type": "object",
++        "properties": {
++          "id": {
++            "type": "string",
++            "format": "uuid",
++            "example": "b7c9e2a1-3d4f-4a6b-8c5d-1e2f3a4b5c6d"
++          },
++          "title": {
++            "type": "string",
++            "example": "Mi primer post en MiniBlog"
++          },
++          "content": {
++            "type": "string",
++            "example": "Contenido interesante de desarrollo web."
++          },
++          "author_id": {
++            "type": "string",
++            "format": "uuid",
++            "example": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
++          },
++          "published": {
++            "type": "boolean",
++            "example": false
++          },
++          "created_at": {
++            "type": "string",
++            "format": "date-time",
++            "example": "2026-10-06T21:55:43.381Z"
++          }
++        }
++      },
++      "PostWithAuthor": {
++        "allOf": [
++          {
++            "$ref": "#/components/schemas/Post"
++          },
++          {
++            "type": "object",
++            "properties": {
++              "author": {
++                "type": "object",
++                "properties": {
++                  "id": {
++                    "type": "string",
++                    "format": "uuid",
++                    "example": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
++                  },
++                  "name": {
++                    "type": "string",
++                    "example": "Sandy Hurtado"
++                  },
++                  "email": {
++                    "type": "string",
++                    "format": "email",
++                    "example": "sandy@example.com"
++                  }
++                }
++              }
++            }
++          }
++        ]
++      },
++      "PostInput": {
++        "type": "object",
++        "required": [
++          "title",
++          "content",
++          "author_id"
++        ],
++        "properties": {
++          "title": {
++            "type": "string",
++            "example": "Mi primer post en MiniBlog"
++          },
++          "content": {
++            "type": "string",
++            "example": "Contenido interesante de desarrollo web."
++          },
++          "author_id": {
++            "type": "string",
++            "format": "uuid",
++            "example": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
++          },
++          "published": {
++            "type": "boolean",
++            "example": false,
++            "description": "Opcional. Por defecto es false."
++          }
++        }
++      },
++      "PostUpdate": {
++        "type": "object",
++        "required": [
++          "title",
++          "content"
++        ],
++        "properties": {
++          "title": {
++            "type": "string",
++            "example": "Título actualizado"
++          },
++          "content": {
++            "type": "string",
++            "example": "Contenido actualizado."
++          },
++          "published": {
++            "type": "boolean",
++            "example": true
++          }
++        }
++      },
++      "Error": {
++        "type": "object",
++        "properties": {
++          "error": {
++            "type": "string",
++            "example": "Descripción del error"
++          }
++        }
++      }
++    },
++    "parameters": {
++      "AuthorId": {
++        "in": "path",
++        "name": "id",
++        "required": true,
++        "schema": {
++          "type": "string",
++          "format": "uuid"
++        },
++        "description": "ID único del autor"
++      },
++      "PostId": {
++        "in": "path",
++        "name": "id",
++        "required": true,
++        "schema": {
++          "type": "string",
++          "format": "uuid"
++        },
++        "description": "ID único del post"
++      },
++      "PostAuthorId": {
++        "in": "path",
++        "name": "authorId",
++        "required": true,
++        "schema": {
++          "type": "string",
++          "format": "uuid"
++        },
++        "description": "ID único del autor"
++      }
++    },
++    "responses": {
++      "BadRequest": {
++        "description": "Datos inválidos, campos obligatorios faltantes o ID con formato incorrecto.",
++        "content": {
++          "application/json": {
++            "schema": {
++              "$ref": "#/components/schemas/Error"
++            }
++          }
++        }
++      },
++      "NotFound": {
++        "description": "Recurso no encontrado.",
++        "content": {
++          "application/json": {
++            "schema": {
++              "$ref": "#/components/schemas/Error"
++            }
++          }
++        }
++      },
++      "Conflict": {
++        "description": "Ya existe un autor con ese email.",
++        "content": {
++          "application/json": {
++            "schema": {
++              "$ref": "#/components/schemas/Error"
++            }
++          }
++        }
++      },
++      "ServerError": {
++        "description": "Error interno del servidor.",
++        "content": {
++          "application/json": {
++            "schema": {
++              "$ref": "#/components/schemas/Error"
++            }
++          }
++        }
++      }
++    }
++  },
++  "paths": {
++    "/posts": {
++      "post": {
++        "summary": "Crea un nuevo post",
++        "tags": [
++          "Posts"
++        ],
++        "description": "Crea un post asociado a un autor que ya exista.",
++        "requestBody": {
++          "required": true,
++          "content": {
++            "application/json": {
++              "schema": {
++                "$ref": "#/components/schemas/PostInput"
++              }
++            }
++          }
++        },
++        "responses": {
++          "201": {
++            "description": "Post creado con éxito.",
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/Post"
++                }
++              }
++            }
++          },
++          "400": {
++            "$ref": "#/components/responses/BadRequest"
++          },
++          "404": {
++            "description": "El autor indicado en author_id no existe.",
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/Error"
++                }
++              }
++            }
++          },
++          "500": {
++            "$ref": "#/components/responses/ServerError"
++          }
++        }
++      },
++      "get": {
++        "summary": "Obtiene la lista de todos los posts",
++        "tags": [
++          "Posts"
++        ],
++        "responses": {
++          "200": {
++            "description": "Lista de posts obtenida con éxito.",
++            "content": {
++              "application/json": {
++                "schema": {
++                  "type": "array",
++                  "items": {
++                    "$ref": "#/components/schemas/Post"
++                  }
++                }
++              }
++            }
++          },
++          "500": {
++            "$ref": "#/components/responses/ServerError"
++          }
++        }
++      }
++    },
++    "/posts/author/{authorId}": {
++      "get": {
++        "summary": "Obtiene todos los posts de un autor específico",
++        "tags": [
++          "Posts"
++        ],
++        "parameters": [
++          {
++            "$ref": "#/components/parameters/PostAuthorId"
++          }
++        ],
++        "responses": {
++          "200": {
++            "description": "Lista de posts del autor obtenida con éxito.",
++            "content": {
++              "application/json": {
++                "schema": {
++                  "type": "array",
++                  "items": {
++                    "$ref": "#/components/schemas/PostWithAuthor"
++                  }
++                }
++              }
++            }
++          },
++          "400": {
++            "$ref": "#/components/responses/BadRequest"
++          },
++          "404": {
++            "description": "Autor no encontrado.",
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/Error"
++                }
++              }
++            }
++          },
++          "500": {
++            "$ref": "#/components/responses/ServerError"
++          }
++        }
++      }
++    },
++    "/posts/{id}": {
++      "get": {
++        "summary": "Obtiene el detalle de un post por su ID",
++        "tags": [
++          "Posts"
++        ],
++        "parameters": [
++          {
++            "$ref": "#/components/parameters/PostId"
++          }
++        ],
++        "responses": {
++          "200": {
++            "description": "Post encontrado.",
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/Post"
++                }
++              }
++            }
++          },
++          "400": {
++            "$ref": "#/components/responses/BadRequest"
++          },
++          "404": {
++            "$ref": "#/components/responses/NotFound"
++          },
++          "500": {
++            "$ref": "#/components/responses/ServerError"
++          }
++        }
++      },
++      "put": {
++        "summary": "Actualiza un post existente",
++        "tags": [
++          "Posts"
++        ],
++        "description": "Envía solo los campos que quieras cambiar (title, content y/o published).",
++        "parameters": [
++          {
++            "$ref": "#/components/parameters/PostId"
++          }
++        ],
++        "requestBody": {
++          "required": true,
++          "content": {
++            "application/json": {
++              "schema": {
++                "$ref": "#/components/schemas/PostUpdate"
++              }
++            }
++          }
++        },
++        "responses": {
++          "200": {
++            "description": "Post actualizado.",
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/Post"
++                }
++              }
++            }
++          },
++          "400": {
++            "$ref": "#/components/responses/BadRequest"
++          },
++          "404": {
++            "$ref": "#/components/responses/NotFound"
++          },
++          "500": {
++            "$ref": "#/components/responses/ServerError"
++          }
++        }
++      },
++      "delete": {
++        "summary": "Elimina un post",
++        "tags": [
++          "Posts"
++        ],
++        "parameters": [
++          {
++            "$ref": "#/components/parameters/PostId"
++          }
++        ],
++        "responses": {
++          "204": {
++            "description": "Post eliminado correctamente (sin contenido)."
++          },
++          "400": {
++            "$ref": "#/components/responses/BadRequest"
++          },
++          "404": {
++            "$ref": "#/components/responses/NotFound"
++          },
++          "500": {
++            "$ref": "#/components/responses/ServerError"
++          }
++        }
++      }
++    },
++    "/authors": {
++      "get": {
++        "summary": "Obtiene la lista de todos los autores",
++        "tags": [
++          "Autores"
++        ],
++        "responses": {
++          "200": {
++            "description": "Lista de autores obtenida exitosamente.",
++            "content": {
++              "application/json": {
++                "schema": {
++                  "type": "array",
++                  "items": {
++                    "$ref": "#/components/schemas/Author"
++                  }
++                }
++              }
++            }
++          },
++          "500": {
++            "$ref": "#/components/responses/ServerError"
++          }
++        }
++      },
++      "post": {
++        "summary": "Crea un nuevo autor",
++        "tags": [
++          "Autores"
++        ],
++        "description": "Registra un autor validando que el nombre no esté vacío y que el email tenga formato válido y sea único. El email se guarda en minúsculas.",
++        "requestBody": {
++          "required": true,
++          "content": {
++            "application/json": {
++              "schema": {
++                "$ref": "#/components/schemas/AuthorInput"
++              }
++            }
++          }
++        },
++        "responses": {
++          "201": {
++            "description": "Autor creado exitosamente.",
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/Author"
++                }
++              }
++            }
++          },
++          "400": {
++            "$ref": "#/components/responses/BadRequest"
++          },
++          "409": {
++            "$ref": "#/components/responses/Conflict"
++          },
++          "500": {
++            "$ref": "#/components/responses/ServerError"
++          }
++        }
++      }
++    },
++    "/authors/{id}": {
++      "get": {
++        "summary": "Obtiene el detalle de un autor por su ID",
++        "tags": [
++          "Autores"
++        ],
++        "parameters": [
++          {
++            "$ref": "#/components/parameters/AuthorId"
++          }
++        ],
++        "responses": {
++          "200": {
++            "description": "Autor encontrado exitosamente.",
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/Author"
++                }
++              }
++            }
++          },
++          "400": {
++            "$ref": "#/components/responses/BadRequest"
++          },
++          "404": {
++            "$ref": "#/components/responses/NotFound"
++          },
++          "500": {
++            "$ref": "#/components/responses/ServerError"
++          }
++        }
++      },
++      "put": {
++        "summary": "Actualiza un autor existente",
++        "tags": [
++          "Autores"
++        ],
++        "description": "name es obligatorio; email y bio son opcionales (si no se envían, se conservan).",
++        "parameters": [
++          {
++            "$ref": "#/components/parameters/AuthorId"
++          }
++        ],
++        "requestBody": {
++          "required": true,
++          "content": {
++            "application/json": {
++              "schema": {
++                "$ref": "#/components/schemas/AuthorUpdate"
++              }
++            }
++          }
++        },
++        "responses": {
++          "200": {
++            "description": "Autor actualizado correctamente.",
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/Author"
++                }
++              }
++            }
++          },
++          "400": {
++            "$ref": "#/components/responses/BadRequest"
++          },
++          "404": {
++            "$ref": "#/components/responses/NotFound"
++          },
++          "409": {
++            "$ref": "#/components/responses/Conflict"
++          },
++          "500": {
++            "$ref": "#/components/responses/ServerError"
++          }
++        }
++      },
++      "delete": {
++        "summary": "Elimina un autor",
++        "tags": [
++          "Autores"
++        ],
++        "description": "Elimina el autor y, por ON DELETE CASCADE, también todos sus posts.",
++        "parameters": [
++          {
++            "$ref": "#/components/parameters/AuthorId"
++          }
++        ],
++        "responses": {
++          "204": {
++            "description": "Autor eliminado correctamente (sin contenido)."
++          },
++          "400": {
++            "$ref": "#/components/responses/BadRequest"
++          },
++          "404": {
++            "$ref": "#/components/responses/NotFound"
++          },
++          "500": {
++            "$ref": "#/components/responses/ServerError"
++          }
++        }
++      }
++    }
++  }
++}
+diff --git a/package.json b/package.json
+index b2c9762..d8c9c82 100644
+--- a/package.json
++++ b/package.json
+@@ -1,15 +1,21 @@
+ {
+   "name": "proyectom2_sandy-hurtado",
+   "version": "1.0.0",
+-  "description": "",
+-  "main": "index.js",
++  "description": "API REST de MiniBlog (authors y posts) con Node.js, Express y PostgreSQL",
++  "main": "server.js",
+   "scripts": {
+     "start": "node server.js",
+     "dev": "node --watch server.js",
++    "db:setup": "node setup.js",
++    "db:seed": "node setup.js --seed",
++    "docs:openapi": "node scripts/export-openapi.js",
+     "test": "vitest run --globals"
+   },
++  "engines": {
++    "node": ">=20"
++  },
+   "keywords": [],
+-  "author": "",
++  "author": "Sandy Hurtado",
+   "license": "ISC",
+   "type": "commonjs",
+   "dependencies": {
+diff --git a/scripts/export-openapi.js b/scripts/export-openapi.js
+new file mode 100644
+index 0000000..384b2f8
+--- /dev/null
++++ b/scripts/export-openapi.js
+@@ -0,0 +1,7 @@
++const fs = require('fs');
++const path = require('path');
++const { specs } = require('../src/config/swagger');
++
++const output = path.join(__dirname, '..', 'openapi.json');
++fs.writeFileSync(output, JSON.stringify(specs, null, 2) + '\n');
++console.log(`✅ Especificación OpenAPI generada en ${output}`);
+diff --git a/server.js b/server.js
+index ac89de1..04e39c5 100644
+--- a/server.js
++++ b/server.js
+@@ -1,7 +1,14 @@
+ const app = require('./app');
++const pool = require('./src/config/db');
+ 
+ const PORT = process.env.PORT || 8080;
+ 
+ app.listen(PORT, () => {
+   console.log(`🚀 Servidor corriendo exitosamente en el puerto ${PORT}`);
+-});
+\ No newline at end of file
++});
++
++// Prueba rápida de conexión al iniciar
++pool
++  .query('SELECT 1')
++  .then(() => console.log('✅ Conectado exitosamente a la base de datos PostgreSQL'))
++  .catch((err) => console.error('❌ Error al conectar a la base de datos PostgreSQL:', err.message));
+diff --git a/setup.js b/setup.js
+index 82a3f2a..d9511db 100644
+--- a/setup.js
++++ b/setup.js
+@@ -1,39 +1,65 @@
+ const { Client } = require('pg');
+ const fs = require('fs');
+-require('dotenv').config();
++const path = require('path');
++require('dotenv').config({ quiet: true });
+ 
+-const dbUrl = process.env.DATABASE_URL;
++const { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT } = process.env;
++const dbUrl =
++  process.env.DATABASE_URL ||
++  (DB_HOST &&
++    `postgresql://${encodeURIComponent(DB_USER)}:${encodeURIComponent(DB_PASSWORD)}@${DB_HOST}:${DB_PORT || 5432}/${DB_NAME}`);
++const withSeed = process.argv.includes('--seed');
++const ssl = process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false;
+ 
+-async function prepararBaseDeDatos() {
+-  try {
+-    // 1. Conectarnos primero a la base de datos por defecto 'postgres'
+-    const urlDefault = dbUrl.replace('/blog_db', '/postgres');
+-    const clientBase = new Client({ connectionString: urlDefault });
+-    await clientBase.connect();
++const readSql = (file) => fs.readFileSync(path.join(__dirname, 'db', file), 'utf8');
++
++async function crearBaseSiNoExiste() {
++  // 1. Conectarnos primero a la base de datos por defecto 'postgres'
++  const url = new URL(dbUrl);
++  const dbName = decodeURIComponent(url.pathname.slice(1));
++  url.pathname = '/postgres';
+ 
+-    // 2. Crear la base de datos blog_db si no existe
+-    const existe = await clientBase.query("SELECT 1 FROM pg_database WHERE datname='blog_db'");
++  const client = new Client({ connectionString: url.toString(), ssl });
++  await client.connect();
++  try {
++    // 2. Crear la base de datos si no existe
++    const existe = await client.query('SELECT 1 FROM pg_database WHERE datname = $1', [dbName]);
+     if (existe.rowCount === 0) {
+-      await clientBase.query('CREATE DATABASE blog_db;');
+-      console.log('✅ Base de datos "blog_db" creada con éxito.');
++      await client.query(`CREATE DATABASE "${dbName.replace(/"/g, '""')}"`);
++      console.log(`✅ Base de datos "${dbName}" creada.`);
+     } else {
+-      console.log('ℹ️ La base de datos "blog_db" ya existía.');
++      console.log(`ℹ️  La base de datos "${dbName}" ya existía.`);
+     }
+-    await clientBase.end();
++  } finally {
++    await client.end();
++  }
++}
+ 
+-    // 3. Conectarnos a 'blog_db' y crear las tablas desde init.sql
+-    const clientBlog = new Client({ connectionString: dbUrl });
+-    await clientBlog.connect();
++async function prepararBaseDeDatos() {
++  if (!dbUrl) {
++    throw new Error('Falta DATABASE_URL (o DB_HOST, DB_USER, DB_PASSWORD y DB_NAME) en el archivo .env');
++  }
+ 
+-    const scriptSQL = fs.readFileSync('./init.sql', 'utf8');
+-    await clientBlog.query(scriptSQL);
+-    console.log('✅ Tablas "authors" y "posts" creadas con éxito.');
++  await crearBaseSiNoExiste();
+ 
+-   await clientBlog.end();
+-    console.log('🚀 ¡Todo listo para continuar!');
+-  } catch (error) {
+-    console.error('❌ ERROR COMPLETO:', error); // <-- Cambiamos esto para ver todo el detalle
++  // 3. Conectarnos a la base y crear las tablas desde db/schema.sql
++  const client = new Client({ connectionString: dbUrl, ssl });
++  await client.connect();
++  try {
++    await client.query(readSql('schema.sql'));
++    console.log('✅ Tablas "authors" y "posts" listas.');
++
++    if (withSeed) {
++      await client.query(readSql('seed.sql'));
++      console.log('🌱 Datos de ejemplo cargados.');
++    }
++  } finally {
++    await client.end();
+   }
++  console.log('🚀 ¡Todo listo!');
+ }
+ 
+-prepararBaseDeDatos();
+\ No newline at end of file
++prepararBaseDeDatos().catch((error) => {
++  console.error('❌ Error preparando la base de datos:', error.message);
++  process.exit(1);
++});
+diff --git a/src/config/db.js b/src/config/db.js
+index ea400d3..03d911a 100644
+--- a/src/config/db.js
++++ b/src/config/db.js
+@@ -1,24 +1,23 @@
+ const { Pool } = require('pg');
+-require('dotenv').config();
++require('dotenv').config({ quiet: true });
++
++const connection = process.env.DATABASE_URL
++  ? { connectionString: process.env.DATABASE_URL }
++  : {
++      host: process.env.DB_HOST,
++      user: process.env.DB_USER,
++      password: process.env.DB_PASSWORD,
++      database: process.env.DB_NAME,
++      port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 5432,
++    };
+ 
+-// Creamos el Pool asegurando que la contraseña sea un string válido
+ const pool = new Pool({
+-  connectionString: process.env.DATABASE_URL,
+-  host: process.env.DB_HOST || 'localhost',
+-  user: process.env.DB_USER || 'postgres',
+-  password: process.env.DB_PASSWORD ? String(process.env.DB_PASSWORD) : '1106',
+-  database: process.env.DB_NAME || 'blog_db',
+-  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 5432,
++  ...connection,
++  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+ });
+ 
+-// Prueba rápida de conexión al iniciar
+-pool.connect((err, client, release) => {
+-  if (err) {
+-    console.error('❌ Error al conectar a la base de datos PostgreSQL:', err.stack);
+-  } else {
+-    console.log('✅ Conectado exitosamente a la base de datos PostgreSQL');
+-    release();
+-  }
++pool.on('error', (err) => {
++  console.error('❌ Error inesperado en el Pool de PostgreSQL:', err.message);
+ });
+ 
+-module.exports = pool;
+\ No newline at end of file
++module.exports = pool;
+diff --git a/src/config/swagger.js b/src/config/swagger.js
+index 3eaaae4..670289e 100644
+--- a/src/config/swagger.js
++++ b/src/config/swagger.js
+@@ -1,3 +1,4 @@
++const path = require('path');
+ const swaggerJsdoc = require('swagger-jsdoc');
+ const swaggerUi = require('swagger-ui-express');
+ const swaggerComponents = require('./swaggerComponents'); // 👈 nuevo
+@@ -18,7 +19,7 @@ const options = {
+     ],
+     ...swaggerComponents, // 👈 nuevo: agrega tags y components
+   },
+-  apis: ['./src/routes/*.js'],
++  apis: [path.join(__dirname, '..', 'routes', '*.js')],
+ };
+ 
+ const specs = swaggerJsdoc(options);
+diff --git a/src/config/swaggerComponents.js b/src/config/swaggerComponents.js
+index b5e4aa9..002f8d7 100644
+--- a/src/config/swaggerComponents.js
++++ b/src/config/swaggerComponents.js
+@@ -22,7 +22,8 @@ module.exports = {
+           id: { type: 'string', format: 'uuid', example: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' },
+           name: { type: 'string', example: 'Sandy Hurtado' },
+           email: { type: 'string', format: 'email', example: 'sandy@example.com' },
+-          bio: { type: 'string', example: 'Desarrolladora Full Stack' },
++          bio: { type: 'string', nullable: true, example: 'Desarrolladora Full Stack' },
++          created_at: { type: 'string', format: 'date-time', example: '2026-10-06T21:55:43.381Z' },
+         },
+       },
+       AuthorInput: {
+@@ -51,6 +52,7 @@ module.exports = {
+           content: { type: 'string', example: 'Contenido interesante de desarrollo web.' },
+           author_id: { type: 'string', format: 'uuid', example: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' },
+           published: { type: 'boolean', example: false },
++          created_at: { type: 'string', format: 'date-time', example: '2026-10-06T21:55:43.381Z' },
+         },
+       },
+       PostWithAuthor: {
+diff --git a/src/middlewares/errorHandler.js b/src/middlewares/errorHandler.js
+index 5e7f566..f30a323 100644
+--- a/src/middlewares/errorHandler.js
++++ b/src/middlewares/errorHandler.js
+@@ -26,9 +26,13 @@ function errorHandler(err, req, res, next) {
+       });
+ 
+     case '23503': // llave foránea (relación entre tablas)
+-      return res.status(409).json({
+-        error: 'La operación no es posible porque hay registros relacionados (por ejemplo, el autor tiene posts)',
+-      });
++      return res.status(404).json({ error: 'El registro relacionado no existe' });
++
++    case '23514':
++      return res.status(400).json({ error: 'Uno de los campos tiene un valor no permitido' });
++
++    case '22001':
++      return res.status(400).json({ error: 'Uno de los campos supera la longitud máxima permitida' });
+   }
+ 
+   // Cualquier otro error: se registra en consola/Railway y se responde 500
+diff --git a/src/routes/authorRoutes.js b/src/routes/authorRoutes.js
+index 7da1abd..e8614b4 100644
+--- a/src/routes/authorRoutes.js
++++ b/src/routes/authorRoutes.js
+@@ -16,25 +16,12 @@ const authorController = require('../controllers/authorController');
+  *             schema:
+  *               type: array
+  *               items:
+- *                 type: object
+- *                 properties:
+- *                   id:
+- *                     type: string
+- *                     format: uuid
+- *                     example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+- *                   name:
+- *                     type: string
+- *                     example: "Sandy Hurtado"
+- *                   email:
+- *                     type: string
+- *                     example: "sandy@example.com"
+- *                   bio:
+- *                     type: string
+- *                     example: "Desarrolladora Full Stack"
++ *                 $ref: '#/components/schemas/Author'
++ *       500:
++ *         $ref: '#/components/responses/ServerError'
+  */
+ router.get('/', authorController.getAllAuthors);
+ 
+-
+ /**
+  * @swagger
+  * /authors/{id}:
+@@ -42,18 +29,20 @@ router.get('/', authorController.getAllAuthors);
+  *     summary: Obtiene el detalle de un autor por su ID
+  *     tags: ["Autores"]
+  *     parameters:
+- *       - in: path
+- *         name: id
+- *         required: true
+- *         schema:
+- *           type: string
+- *           format: uuid
+- *         description: ID único del autor
++ *       - $ref: '#/components/parameters/AuthorId'
+  *     responses:
+  *       200:
+  *         description: Autor encontrado exitosamente.
++ *         content:
++ *           application/json:
++ *             schema:
++ *               $ref: '#/components/schemas/Author'
++ *       400:
++ *         $ref: '#/components/responses/BadRequest'
+  *       404:
+- *         description: Autor no encontrado.
++ *         $ref: '#/components/responses/NotFound'
++ *       500:
++ *         $ref: '#/components/responses/ServerError'
+  */
+ router.get('/:id', authorController.getAuthorById);
+ 
+@@ -63,49 +52,26 @@ router.get('/:id', authorController.getAuthorById);
+  *   post:
+  *     summary: Crea un nuevo autor
+  *     tags: ["Autores"]
+- *     description: Registra un autor validando que el nombre no esté vacío y el email sea único.
++ *     description: Registra un autor validando que el nombre no esté vacío y que el email tenga formato válido y sea único. El email se guarda en minúsculas.
+  *     requestBody:
+  *       required: true
+  *       content:
+  *         application/json:
+  *           schema:
+- *             type: object
+- *             required:
+- *               - name
+- *               - email
+- *             properties:
+- *               name:
+- *                 type: string
+- *                 example: "Sandy Hurtado"
+- *               email:
+- *                 type: string
+- *                 example: "Sandy@example.com"
+- *               bio:
+- *                 type: string
+- *                 example: "Desarrolladora Full Stack 79"
++ *             $ref: '#/components/schemas/AuthorInput'
+  *     responses:
+  *       201:
+  *         description: Autor creado exitosamente.
+  *         content:
+  *           application/json:
+  *             schema:
+- *               type: object
+- *               properties:
+- *                 id:
+- *                   type: string
+- *                   format: uuid
+- *                   example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+- *                 name:
+- *                   type: string
+- *                   example: "Sandy Hurtado"
+- *                 email:
+- *                   type: string
+- *                   example: "Sandy@example.com"
+- *                 bio:
+- *                   type: string
+- *                   example: "Desarrolladora Full Stack 79"
++ *               $ref: '#/components/schemas/Author'
+  *       400:
+- *         description: Datos inválidos o email duplicado.
++ *         $ref: '#/components/responses/BadRequest'
++ *       409:
++ *         $ref: '#/components/responses/Conflict'
++ *       500:
++ *         $ref: '#/components/responses/ServerError'
+  */
+ router.post('/', authorController.createAuthor);
+ 
+@@ -115,31 +81,30 @@ router.post('/', authorController.createAuthor);
+  *   put:
+  *     summary: Actualiza un autor existente
+  *     tags: ["Autores"]
++ *     description: name es obligatorio; email y bio son opcionales (si no se envían, se conservan).
+  *     parameters:
+- *       - in: path
+- *         name: id
+- *         required: true
+- *         schema:
+- *           type: string
+- *           format: uuid
++ *       - $ref: '#/components/parameters/AuthorId'
+  *     requestBody:
+  *       required: true
+  *       content:
+  *         application/json:
+  *           schema:
+- *             type: object
+- *             properties:
+- *               name:
+- *                 type: string
+- *               email:
+- *                 type: string
+- *               bio:
+- *                 type: string
++ *             $ref: '#/components/schemas/AuthorUpdate'
+  *     responses:
+  *       200:
+  *         description: Autor actualizado correctamente.
++ *         content:
++ *           application/json:
++ *             schema:
++ *               $ref: '#/components/schemas/Author'
++ *       400:
++ *         $ref: '#/components/responses/BadRequest'
+  *       404:
+- *         description: Autor no encontrado.
++ *         $ref: '#/components/responses/NotFound'
++ *       409:
++ *         $ref: '#/components/responses/Conflict'
++ *       500:
++ *         $ref: '#/components/responses/ServerError'
+  */
+ router.put('/:id', authorController.updateAuthor);
+ 
+@@ -149,19 +114,19 @@ router.put('/:id', authorController.updateAuthor);
+  *   delete:
+  *     summary: Elimina un autor
+  *     tags: ["Autores"]
++ *     description: Elimina el autor y, por ON DELETE CASCADE, también todos sus posts.
+  *     parameters:
+- *       - in: path
+- *         name: id
+- *         required: true
+- *         schema:
+- *           type: string
+- *           format: uuid
++ *       - $ref: '#/components/parameters/AuthorId'
+  *     responses:
+- *       200:
+- *         description: Autor eliminado correctamente.
++ *       204:
++ *         description: Autor eliminado correctamente (sin contenido).
++ *       400:
++ *         $ref: '#/components/responses/BadRequest'
+  *       404:
+- *         description: Autor no encontrado.
++ *         $ref: '#/components/responses/NotFound'
++ *       500:
++ *         $ref: '#/components/responses/ServerError'
+  */
+ router.delete('/:id', authorController.deleteAuthor);
+ 
+-module.exports = router;
+\ No newline at end of file
++module.exports = router;
+diff --git a/src/routes/postRoutes.js b/src/routes/postRoutes.js
+index 86acd2b..a323593 100644
+--- a/src/routes/postRoutes.js
++++ b/src/routes/postRoutes.js
+@@ -77,7 +77,7 @@ router.get('/', postController.getAllPosts);
+  *             schema:
+  *               type: array
+  *               items:
+- *                 $ref: '#/components/schemas/Post'
++ *                 $ref: '#/components/schemas/PostWithAuthor'
+  *       400:
+  *         $ref: '#/components/responses/BadRequest'
+  *       404:
+@@ -155,8 +155,8 @@ router.put('/:id', postController.updatePost);
+  *     parameters:
+  *       - $ref: '#/components/parameters/PostId'
+  *     responses:
+- *       200:
+- *         description: Post eliminado correctamente.
++ *       204:
++ *         description: Post eliminado correctamente (sin contenido).
+  *       400:
+  *         $ref: '#/components/responses/BadRequest'
+  *       404:
+diff --git a/src/services/authorService.js b/src/services/authorService.js
+index b7b376a..907bdcc 100644
+--- a/src/services/authorService.js
++++ b/src/services/authorService.js
+@@ -3,7 +3,7 @@ const pool = require('../config/db');
+ const authorService = {
+   // Obtener todos los autores
+   async getAll() {
+-    const result = await pool.query('SELECT * FROM authors ORDER BY id ASC');
++    const result = await pool.query('SELECT * FROM authors ORDER BY created_at ASC');
+     return result.rows;
+   },
+ 
+diff --git a/src/services/postService.js b/src/services/postService.js
+index ac25e96..59840e1 100644
+--- a/src/services/postService.js
++++ b/src/services/postService.js
+@@ -3,7 +3,6 @@ const pool = require('../config/db');
+ const postService = {
+   // Obtener todos los posts
+   async getAll() {
+-    // en getAll()
+     const result = await pool.query('SELECT * FROM posts ORDER BY created_at ASC');
+     return result.rows;
+   },
+@@ -21,7 +20,7 @@ const postService = {
+       FROM posts p
+       JOIN authors a ON p.author_id = a.id
+       WHERE p.author_id = $1
+-      ORDER BY p.id ASC;
++      ORDER BY p.created_at ASC;
+     `;
+     const result = await pool.query(query, [authorId]);
+     return result.rows;
+diff --git a/test/api.gem.test.js b/test/api.gem.test.js
+deleted file mode 100644
+index 62cdad4..0000000
+--- a/test/api.gem.test.js
++++ /dev/null
+@@ -1,110 +0,0 @@
+-
+-const request = require('supertest');
+-const app = require('../app'); 
+- // Asegúrate de que server.js termine con "module.exports = app;" 
+- describe('Suite de Pruebas E2E - API MiniBlog', () => { 
+- // Variables para guardar los IDs y usarlos en distintos tests  
+-   let testAuthorId;    
+-   let testPostId;   
+- 
+-   describe('1. Pruebas de Autores (Authors)', () => {  
+-          it('POST /authors - Debería crear un autor correctamente (201)', async () => { 
+-                       const res = await request(app)             
+-                          .post('/authors')             
+-                             .send({               
+-                                     name: 'Test Author',      
+-                                     email: `tester_${Date.now()}@example.com`,  
+-                                     bio: 'Bio generada por el test' 
+-                                    });         
+-                                    
+-                        expect(res.status).toBe(201); 
+-                        expect(res.body).toHaveProperty('id');            
+-                        expect(res.body.name).toBe('Test Author');
+-
+-                        // Guardamos el ID para los siguientes tests            
+-                        testAuthorId = res.body.id;         
+-                    });        
+-
+-                    it('POST /authors - Debería fallar si falta el nombre (400)', async () => {
+-                        const res = await request(app)                
+-                        .post('/authors')                
+-                        .send({                    
+-                            email: 'sinnombre@example.com'                
+-                        });            
+-                        
+-                        expect(res.status).toBe(400);            
+-                        expect(res.body.error).toBe('El nombre no puede estar vacío');        
+-                    });        
+-                    it('POST /authors - Debería fallar por email duplicado (400)', async () => {            
+-                        const emailDuplicado = `dup_${Date.now()}@example.com`;            
+-                        // 1. Creamos el primero            
+-                        await request(app).post('/authors').send({ name: 'Original', email: emailDuplicado });          
+-
+-                        // 2. Intentamos crear el segundo con el mismo mail            
+-                        const res = await request(app)                
+-                        .post('/authors')                
+-                        .send({ name: 'Copia', email: emailDuplicado });            
+-                        expect(res.status).toBe(400);            
+-                        expect(res.body.error).toBe('El email ya está registrado');        
+-                    });    
+-                });    
+-
+-                describe('2. Pruebas de Publicaciones (Posts)', () => {        
+-                    it('POST /posts - Debería crear un post asignado al autor de prueba (201)', async () => {            
+-                        const res = await request(app)                
+-                        .post('/posts')                
+-                        .send({                    
+-                            title: 'Título de prueba',                    
+-                            content: 'Contenido validado por el test',                    
+-                            author_id: testAuthorId                 
+-                        });            
+-
+-                        expect(res.status).toBe(201);            
+-                        expect(res.body).toHaveProperty('id');            
+-                        expect(res.body.author_id).toBe(testAuthorId);            
+-                        // Guardamos el ID para borrarlo luego 
+-
+-                        testPostId = res.body.id;        
+-                    });        
+-                    it('POST /posts - Debería fallar si faltan campos obligatorios (400)', async () => {            
+-                        const res = await request(app)                
+-                        .post('/posts')                
+-                        .send({                    
+-                            title: 'Falta contenido y autor'                
+-                        });            
+-                        expect(res.status).toBe(400);            
+-                        expect(res.body.error).toBe('Los campos title, content y author_id son obligatorios');        
+-                    });        it('POST /posts - Debería fallar si el author_id no existe en la base (400)', async () => {            const res = await request(app)                
+-                        .post('/posts')                
+-                        .send({                    
+-                            title: 'Post fantasma',                    
+-                            content: 'Este autor no existe',                    
+-                            author_id: 999999                
+-                        });            
+-                        expect(res.status).toBe(400);            
+-                        expect(res.body.error).toBe('El author_id especificado no existe'); 
+-                        // Valida tu catch de Postgres        
+-                        });        
+-                        it('GET /posts/author/:authorId - Debería listar los posts de un autor específico (200)', async () => {            
+-                            const res = await request(app).get(`/posts/author/${testAuthorId}`);            
+-                            expect(res.status).toBe(200);            
+-                            expect(Array.isArray(res.body)).toBe(true);            
+-                            expect(res.body.length).toBeGreaterThan(0);            
+-                            expect(res.body[0].author_id).toBe(testAuthorId);        
+-                        });    
+-                    });    
+-                    describe('3. Pruebas de Eliminación y Manejo de Errores 404', () => {        
+-                        it('DELETE /posts/:id - Debería eliminar el post correctamente (204)', async () => {            
+-                            const res = await request(app).delete(`/posts/${testPostId}`);            
+-                            expect(res.status).toBe(204);        
+-                        });        
+-                        it('GET /posts/:id - Debería fallar al buscar el post recién eliminado (404)', async () => {            
+-                            const res = await request(app).get(`/posts/${testPostId}`);            
+-                            expect(res.status).toBe(404);            
+-                            expect(res.body.error).toBe('Post no encontrado');        
+-                        });        it('DELETE /authors/:id - Debería eliminar el autor de prueba (204)', async () => {            
+-                            const res = await request(app).delete(`/authors/${testAuthorId}`);            
+-                            expect(res.status).toBe(204);        
+-                        });    
+-                    }); 
+-                });
+\ No newline at end of file
+diff --git a/test/api.test.js b/test/api.test.js
+new file mode 100644
+index 0000000..0bfcd05
+--- /dev/null
++++ b/test/api.test.js
+@@ -0,0 +1,234 @@
++const request = require('supertest');
++const app = require('../app');
++const pool = require('../src/config/db');
++
++const UUID_INEXISTENTE = '00000000-0000-4000-8000-000000000000';
++const emailUnico = (prefijo) => `${prefijo}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}@example.com`;
++
++describe('API MiniBlog', () => {
++  let authorId;
++  let postId;
++
++  afterAll(async () => {
++    await pool.query("DELETE FROM authors WHERE email LIKE '%\\_test\\_%@example.com'");
++    await pool.end();
++  });
++
++  describe('Authors', () => {
++    it('POST /authors crea un autor (201) y guarda el email en minúsculas', async () => {
++      const email = emailUnico('Autor_test_');
++      const res = await request(app)
++        .post('/authors')
++        .send({ name: 'Test Author', email, bio: 'Bio generada por el test' });
++
++      expect(res.status).toBe(201);
++      expect(res.body).toMatchObject({ name: 'Test Author', email: email.toLowerCase() });
++      expect(res.body).toHaveProperty('id');
++      authorId = res.body.id;
++    });
++
++    it('POST /authors falla si falta el nombre (400)', async () => {
++      const res = await request(app).post('/authors').send({ email: emailUnico('sin_nombre_test_') });
++
++      expect(res.status).toBe(400);
++      expect(res.body.error).toBe('El nombre no puede estar vacío');
++    });
++
++    it('POST /authors falla si el email no tiene formato válido (400)', async () => {
++      const res = await request(app).post('/authors').send({ name: 'Sin arroba', email: 'correo-invalido' });
++
++      expect(res.status).toBe(400);
++      expect(res.body.error).toBe('El email no tiene un formato válido');
++    });
++
++    it('POST /authors falla si el email ya está registrado (409)', async () => {
++      const email = emailUnico('dup_test_');
++      await request(app).post('/authors').send({ name: 'Original', email });
++
++      const res = await request(app).post('/authors').send({ name: 'Copia', email: email.toUpperCase() });
++
++      expect(res.status).toBe(409);
++      expect(res.body.error).toBe('El email ya está registrado');
++    });
++
++    it('GET /authors lista los autores (200) e incluye el creado', async () => {
++      const res = await request(app).get('/authors');
++
++      expect(res.status).toBe(200);
++      expect(Array.isArray(res.body)).toBe(true);
++      expect(res.body.some((a) => a.id === authorId)).toBe(true);
++    });
++
++    it('GET /authors/:id devuelve el autor (200)', async () => {
++      const res = await request(app).get(`/authors/${authorId}`);
++
++      expect(res.status).toBe(200);
++      expect(res.body.id).toBe(authorId);
++    });
++
++    it('GET /authors/:id responde 404 si el autor no existe', async () => {
++      const res = await request(app).get(`/authors/${UUID_INEXISTENTE}`);
++
++      expect(res.status).toBe(404);
++      expect(res.body.error).toBe('Autor no encontrado');
++    });
++
++    it('GET /authors/:id responde 400 si el ID no es un UUID', async () => {
++      const res = await request(app).get('/authors/abc');
++
++      expect(res.status).toBe(400);
++      expect(res.body.error).toBe('El ID tiene un formato inválido');
++    });
++
++    it('PUT /authors/:id actualiza el autor y conserva el email si no se envía (200)', async () => {
++      const antes = await request(app).get(`/authors/${authorId}`);
++      const res = await request(app).put(`/authors/${authorId}`).send({ name: 'Autor Editado', bio: 'Nueva bio' });
++
++      expect(res.status).toBe(200);
++      expect(res.body).toMatchObject({ name: 'Autor Editado', bio: 'Nueva bio', email: antes.body.email });
++    });
++
++    it('PUT /authors/:id falla si el nombre está vacío (400)', async () => {
++      const res = await request(app).put(`/authors/${authorId}`).send({ name: '   ' });
++
++      expect(res.status).toBe(400);
++    });
++
++    it('PUT /authors/:id responde 404 si el autor no existe', async () => {
++      const res = await request(app).put(`/authors/${UUID_INEXISTENTE}`).send({ name: 'Nadie' });
++
++      expect(res.status).toBe(404);
++    });
++  });
++
++  describe('Posts', () => {
++    it('POST /posts crea un post del autor (201) con published=false por defecto', async () => {
++      const res = await request(app)
++        .post('/posts')
++        .send({ title: 'Título de prueba', content: 'Contenido del test', author_id: authorId });
++
++      expect(res.status).toBe(201);
++      expect(res.body).toMatchObject({ author_id: authorId, title: 'Título de prueba', published: false });
++      postId = res.body.id;
++    });
++
++    it('POST /posts falla si faltan campos obligatorios (400)', async () => {
++      const res = await request(app).post('/posts').send({ title: 'Falta contenido y autor' });
++
++      expect(res.status).toBe(400);
++      expect(res.body.error).toBe('Los campos title, content y author_id son obligatorios');
++    });
++
++    it('POST /posts falla si published no es booleano (400)', async () => {
++      const res = await request(app)
++        .post('/posts')
++        .send({ title: 'T', content: 'C', author_id: authorId, published: 'si' });
++
++      expect(res.status).toBe(400);
++      expect(res.body.error).toBe('El campo published debe ser true o false');
++    });
++
++    it('POST /posts responde 404 si el author_id no existe', async () => {
++      const res = await request(app)
++        .post('/posts')
++        .send({ title: 'Post fantasma', content: 'Este autor no existe', author_id: UUID_INEXISTENTE });
++
++      expect(res.status).toBe(404);
++      expect(res.body.error).toBe('El autor indicado en author_id no existe');
++    });
++
++    it('GET /posts lista los posts (200)', async () => {
++      const res = await request(app).get('/posts');
++
++      expect(res.status).toBe(200);
++      expect(res.body.some((p) => p.id === postId)).toBe(true);
++    });
++
++    it('GET /posts/:id devuelve el post (200)', async () => {
++      const res = await request(app).get(`/posts/${postId}`);
++
++      expect(res.status).toBe(200);
++      expect(res.body.id).toBe(postId);
++    });
++
++    it('GET /posts/author/:authorId lista los posts del autor con sus datos (200)', async () => {
++      const res = await request(app).get(`/posts/author/${authorId}`);
++
++      expect(res.status).toBe(200);
++      expect(res.body).toHaveLength(1);
++      expect(res.body[0].author_id).toBe(authorId);
++      expect(res.body[0].author.id).toBe(authorId);
++    });
++
++    it('GET /posts/author/:authorId responde 404 si el autor no existe', async () => {
++      const res = await request(app).get(`/posts/author/${UUID_INEXISTENTE}`);
++
++      expect(res.status).toBe(404);
++      expect(res.body.error).toBe('Autor no encontrado');
++    });
++
++    it('PUT /posts/:id actualiza el post (200)', async () => {
++      const res = await request(app)
++        .put(`/posts/${postId}`)
++        .send({ title: 'Título editado', content: 'Contenido editado', published: true });
++
++      expect(res.status).toBe(200);
++      expect(res.body).toMatchObject({ title: 'Título editado', content: 'Contenido editado', published: true });
++    });
++
++    it('PUT /posts/:id falla si falta el content (400)', async () => {
++      const res = await request(app).put(`/posts/${postId}`).send({ title: 'Solo título' });
++
++      expect(res.status).toBe(400);
++      expect(res.body.error).toBe('Los campos title y content son obligatorios');
++    });
++
++    it('DELETE /posts/:id elimina el post (204) y luego responde 404', async () => {
++      const del = await request(app).delete(`/posts/${postId}`);
++      expect(del.status).toBe(204);
++
++      const get = await request(app).get(`/posts/${postId}`);
++      expect(get.status).toBe(404);
++      expect(get.body.error).toBe('Post no encontrado');
++    });
++  });
++
++  describe('Eliminación de autores y errores generales', () => {
++    it('DELETE /authors/:id elimina el autor y sus posts por CASCADE (204)', async () => {
++      const post = await request(app)
++        .post('/posts')
++        .send({ title: 'Post huérfano', content: 'Se borra con el autor', author_id: authorId });
++
++      const res = await request(app).delete(`/authors/${authorId}`);
++      expect(res.status).toBe(204);
++
++      const author = await request(app).get(`/authors/${authorId}`);
++      expect(author.status).toBe(404);
++      const postBorrado = await request(app).get(`/posts/${post.body.id}`);
++      expect(postBorrado.status).toBe(404);
++    });
++
++    it('DELETE /authors/:id responde 404 si el autor no existe', async () => {
++      const res = await request(app).delete(`/authors/${UUID_INEXISTENTE}`);
++
++      expect(res.status).toBe(404);
++    });
++
++    it('responde 400 si el JSON del body está mal formado', async () => {
++      const res = await request(app)
++        .post('/authors')
++        .set('Content-Type', 'application/json')
++        .send('{"name": "Roto",}');
++
++      expect(res.status).toBe(400);
++      expect(res.body.error).toBe('El JSON enviado no es válido');
++    });
++
++    it('responde 404 en una ruta que no existe', async () => {
++      const res = await request(app).get('/ruta-inexistente');
++
++      expect(res.status).toBe(404);
++      expect(res.body.error).toBe('Ruta no encontrada');
++    });
++  });
++});

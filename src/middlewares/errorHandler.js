@@ -26,9 +26,13 @@ function errorHandler(err, req, res, next) {
       });
 
     case '23503': // llave foránea (relación entre tablas)
-      return res.status(409).json({
-        error: 'La operación no es posible porque hay registros relacionados (por ejemplo, el autor tiene posts)',
-      });
+      return res.status(404).json({ error: 'El registro relacionado no existe' });
+
+    case '23514':
+      return res.status(400).json({ error: 'Uno de los campos tiene un valor no permitido' });
+
+    case '22001':
+      return res.status(400).json({ error: 'Uno de los campos supera la longitud máxima permitida' });
   }
 
   // Cualquier otro error: se registra en consola/Railway y se responde 500

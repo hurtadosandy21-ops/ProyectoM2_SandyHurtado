@@ -1,162 +1,238 @@
 # 🚀 MiniBlog API - DevSpark
 
-API RESTful desarrollada con **Node.js**, **Express** y **PostgreSQL** para la gestión de un MiniBlog. Permite administrar autores y publicaciones (posts) utilizando identificadores únicos universales (**UUIDs**) generados por la base de datos.
+API REST desarrollada con **Node.js**, **Express 5** y **PostgreSQL** para gestionar un MiniBlog: autores (`authors`) y publicaciones (`posts`) con una relación **1:N** (un autor tiene muchos posts). Los identificadores son **UUID** generados por la base de datos.
 
 ---
 
-## 📋 Descripción del Proyecto
-Este proyecto implementa el backend para un sistema de blog minimalista. Cuenta con una arquitectura limpia basada en servicios y controladores, validaciones de datos, manejo de errores optimizado, documentación interactiva mediante **OpenAPI (Swagger)** y soporte para despliegue en la nube con **Railway**.
+## 🔗 Enlaces del proyecto
+
+| Recurso | URL |
+|---|---|
+| API en producción (Railway) | https://proyectom2sandyhurtado-production.up.railway.app/ |
+| Swagger UI (producción) | https://proyectom2sandyhurtado-production.up.railway.app/api-docs |
+| Especificación OpenAPI 3.0 | [`openapi.json`](openapi.json) |
+| Repositorio | https://github.com/hurtadosandy21-ops/ProyectoM2_SandyHurtado |
 
 ---
 
-### 🔗 Enlaces del Proyecto
+## 📁 Estructura
 
-- **Swagger:** [Abrir Swagger](https://proyectom2sandyhurtado-production.up.railway.app/api-docs)
+```
+├── app.js                     # Configura Express: middlewares, rutas, 404 y manejador de errores
+├── server.js                  # Arranca el servidor (app.listen)
+├── setup.js                   # Crea la base de datos, aplica el schema y (opcional) el seed
+├── openapi.json               # Especificación OpenAPI generada (npm run docs:openapi)
+├── db/
+│   ├── schema.sql             # Tablas, PK, FK, UNIQUE, NOT NULL, CHECK e índice
+│   └── seed.sql               # Datos de ejemplo
+├── scripts/export-openapi.js  # Exporta la especificación a openapi.json
+├── src/
+│   ├── config/                # Pool de PostgreSQL y configuración de Swagger
+│   ├── routes/                # Rutas + documentación @swagger
+│   ├── controllers/           # Validaciones y respuestas HTTP
+│   ├── services/              # Consultas SQL parametrizadas (lógica de datos)
+│   └── middlewares/           # Manejador global de errores
+└── test/api.test.js           # Tests de integración (Vitest + Supertest)
+```
 
-- **Railway (Producción):** [Abrir Railway](https://proyectom2sandyhurtado-production.up.railway.app/)
+Flujo de una petición: **ruta → controlador (valida) → servicio (SQL con `$1, $2…`) → PostgreSQL**. Cualquier error se envía con `next(error)` al middleware global `errorHandler`.
 
-## 🛠️ Requisitos y Pasos para Ejecutar Local
+---
+
+## 🗄️ Modelo de datos
+
+```
+authors (1) ──────────< (N) posts
+```
+
+| Tabla | Columna | Tipo | Restricciones |
+|---|---|---|---|
+| authors | id | UUID | PK, `DEFAULT gen_random_uuid()` |
+| authors | name | VARCHAR(100) | NOT NULL, no vacío (CHECK) |
+| authors | email | VARCHAR(100) | NOT NULL, **UNIQUE** (se guarda en minúsculas) |
+| authors | bio | TEXT | opcional |
+| authors | created_at | TIMESTAMP | NOT NULL, `DEFAULT CURRENT_TIMESTAMP` |
+| posts | id | UUID | PK, `DEFAULT gen_random_uuid()` |
+| posts | author_id | UUID | NOT NULL, **FK → authors(id) ON DELETE CASCADE** |
+| posts | title | VARCHAR(200) | NOT NULL, no vacío (CHECK) |
+| posts | content | TEXT | NOT NULL, no vacío (CHECK) |
+| posts | published | BOOLEAN | NOT NULL, `DEFAULT FALSE` |
+| posts | created_at | TIMESTAMP | NOT NULL, `DEFAULT CURRENT_TIMESTAMP` |
+
+El script completo está en [`db/schema.sql`](db/schema.sql) y los datos de ejemplo en [`db/seed.sql`](db/seed.sql). Ambos son **idempotentes**: se pueden ejecutar varias veces sin borrar ni duplicar datos.
+
+---
+
+## 🛠️ Ejecutar en local
 
 ### Prerrequisitos
-* **Node.js** (versión 18 o superior recomendada).
-* **PostgreSQL** (versión 16 instalada localmente o un servidor accesible).
 
-### 1. Clonar el repositorio e instalar dependencias
-```
-git clone <url-de-tu-repositorio>
-cd nombre-de-tu-repositorio
+- **Node.js 20 o superior** (lo exige Vitest 5).
+- **PostgreSQL 13 o superior** corriendo en local (o accesible por red).
+
+### 1. Clonar e instalar dependencias
+
+```bash
+git clone https://github.com/hurtadosandy21-ops/ProyectoM2_SandyHurtado.git
+cd ProyectoM2_SandyHurtado
 npm install
 ```
 
-### 2. Configurar las variables de entorno
-Crea un archivo llamado .env en la raíz del proyecto basándote en el siguiente ejemplo:
+### 2. Variables de entorno
 
-```
-Fragmento de código
-PORT=3000
-DB_HOST=localhost
-DB_USER=postgres
-DB_PASSWORD=tu_contraseña
-DB_NAME=miniblog_db
-DB_PORT=5432
+Copia el archivo de ejemplo y edita la contraseña de tu PostgreSQL:
 
+```bash
+cp .env.example .env
 ```
 
-### 3. Configurar la Base de Datos (Setup SQL)
+| Variable | Descripción | Ejemplo |
+|---|---|---|
+| `PORT` | Puerto del servidor (por defecto 8080) | `8080` |
+| `DATABASE_URL` | Cadena de conexión a PostgreSQL | `postgresql://postgres:tu_contraseña@localhost:5432/blog_db` |
+| `DB_SSL` | `true` solo si el servidor exige SSL | `false` |
+| `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_PORT` | Alternativa a `DATABASE_URL`: se usan solo si `DATABASE_URL` no está definida | `localhost`, `postgres`, `tu_contraseña`, `blog_db`, `5432` |
+| `NODE_ENV` | Entorno de ejecución | `development` |
 
-Abre tu cliente de PostgreSQL (como pgAdmin o la terminal psql) y ejecuta el siguiente script para crear las tablas con soporte para UUIDs:
+### 3. Crear la base de datos y las tablas
 
-```
-SQL
--- Borrar tablas anteriores si existen
-DROP TABLE IF EXISTS posts;
-DROP TABLE IF EXISTS authors;
-
--- Crear tabla authors con UUID automático
-CREATE TABLE authors (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(100) NOT NULL,
-    email VARCHAR(100) UNIQUE NOT NULL,
-    bio TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Crear tabla posts con UUID automático y relación con authors
-CREATE TABLE posts (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    author_id UUID REFERENCES authors(id) ON DELETE CASCADE,
-    title VARCHAR(200) NOT NULL,
-    content TEXT NOT NULL,
-    published BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+```bash
+npm run db:setup
 ```
 
-### 4. Ejecutar el servidor en modo desarrollo
+Crea la base `blog_db` si no existe y aplica `db/schema.sql`. Para cargar además los datos de ejemplo:
+
+```bash
+npm run db:seed
 ```
+
+### 4. Levantar el servidor
+
+```bash
 npm run dev
-
-El servidor estará corriendo en http://localhost:8080.
-```
-**🧪 Cómo Ejecutar Tests**
-
-Para ejecutar las pruebas automatizadas del proyecto (si aplica), utiliza el siguiente comando:
-
-```
-npm test
 ```
 
-#### 📄 Documentación OpenAPI / Swagger UI
-
-La documentación de la API está integrada de forma interactiva mediante **Swagger UI** y estandarizada bajo la especificación **OpenAPI**. Esta interfaz gráfica permite explorar, comprender y probar en tiempo real todos los endpoints del MiniBlog (autores y publicaciones), detallando los métodos HTTP (`GET`, `POST`, `PUT`, `DELETE`), los esquemas de datos, los parámetros requeridos (como los identificadores UUID) y los códigos de respuesta.
-
-#### 🔍 ¿Qué ofrece esta documentación interactiva?
-* **Visualización de Contratos:** Muestra claramente la estructura exacta en formato JSON que espera recibir cada ruta y lo que devolverá como respuesta.
-* **Función "Try it out":** Permite ejecutar peticiones directamente desde el navegador web para probar la API sin necesidad de usar herramientas externas como Postman o cURL.
-* **Esquemas de Modelos (Schemas):** Detalla el diccionario de datos estructural de los recursos principales (`Author` y `Post`) y sus restricciones obligatorias.
+La API queda en `http://localhost:8080` y Swagger en `http://localhost:8080/api-docs`.
 
 ---
 
-#### 🔗 Enlaces de Acceso y Ejemplos
+## 📌 Endpoints
 
-Dependiendo de dónde se esté ejecutando el proyecto, la interfaz de la documentación estará disponible a través de las siguientes rutas:
+Todas las respuestas son JSON. Los errores tienen la forma `{ "error": "mensaje" }`.
 
-* **En entorno local (Desarrollo):**
-  Una vez que enciendas tu servidor en tu computadora, la estructura del enlace generado será similar a esta:
-  `http://localhost:3000/api-docs` *(Ejemplo de referencia local)*
+### Authors
 
-* **En producción (Railway):**
-  Una vez completado el despliegue en la nube, la plataforma te asignará un dominio público donde podrás consultar la documentación en vivo:
-  `https://tu-proyecto.up.railway.app/api-docs` *(Ejemplo de URL pública en producción)*
+| Método | Ruta | Descripción | Éxito | Errores |
+|---|---|---|---|---|
+| GET | `/authors` | Lista todos los autores | 200 | 500 |
+| GET | `/authors/:id` | Detalle de un autor | 200 | 400, 404 |
+| POST | `/authors` | Crea un autor (`name`, `email` obligatorios; `bio` opcional) | 201 | 400, 409 |
+| PUT | `/authors/:id` | Actualiza un autor (`name` obligatorio; `email`, `bio` opcionales) | 200 | 400, 404, 409 |
+| DELETE | `/authors/:id` | Elimina un autor y sus posts (CASCADE) | 204 | 400, 404 |
 
-## 5. ☁️ Guía de Deployment en Railway
+### Posts
 
-Para desplegar este proyecto en producción utilizando **Railway**, sigue estos pasos:
+| Método | Ruta | Descripción | Éxito | Errores |
+|---|---|---|---|---|
+| GET | `/posts` | Lista todos los posts | 200 | 500 |
+| GET | `/posts/:id` | Detalle de un post | 200 | 400, 404 |
+| GET | `/posts/author/:authorId` | Posts de un autor (incluye datos del autor) | 200 | 400, 404 |
+| POST | `/posts` | Crea un post (`title`, `content`, `author_id` obligatorios; `published` opcional) | 201 | 400, 404 |
+| PUT | `/posts/:id` | Actualiza un post (`title`, `content` obligatorios; `published` opcional) | 200 | 400, 404 |
+| DELETE | `/posts/:id` | Elimina un post | 204 | 400, 404 |
 
-###  Conectar el repositorio: 
+### Ejemplos
 
-1. **Sube tu código a GitHub.**
-Entra a [Railway](https://railway.app/), crea un nuevo proyecto seleccionando *Deploy from GitHub repo* y vincula tu repositorio.
-2. **Añadir Base de Datos:** Agrega un servicio complementario de **PostgreSQL** dentro del mismo proyecto en Railway.
-3. **Vincular Servicios y Variables de Entorno:**
-   Railway facilita la conexión mediante una única variable unificada:
-   * **`DATABASE_URL`**: Railway genera automáticamente esta cadena de conexión cuando vinculas tu servicio de Node.js con la base de datos de PostgreSQL. Asegúrate de que tu aplicación lea esta variable en lugar de credenciales individuales.
-   * **`PORT`**: Railway lo asigna de forma dinámica, por lo que tu servidor debe configurarse usando `process.env.PORT`.
+```bash
+curl -X POST http://localhost:8080/authors \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Sandy Hurtado", "email": "sandy@example.com", "bio": "Desarrolladora Full Stack"}'
+```
 
-> 💡 **Consejo de configuración en el código:** Para que tu aplicación reconozca esta variable tanto en local (si decides usar una URL de conexión) como en producción, puedes configurar tu `Pool` de PostgreSQL en Node.js de la siguiente manera:
-> ```javascript
-> const { Pool } = require('pg');
-> 
-> const pool = new Pool({
->   connectionString: process.env.DATABASE_URL,
->   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-> });
-> ```
+```bash
+curl -X POST http://localhost:8080/posts \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Mi primer post", "content": "Hola mundo", "author_id": "<uuid-del-autor>", "published": true}'
+```
 
-> 📌 **Nota sobre la implementación:** Esta es la forma en la que se configuró y estructuró este proyecto específico utilizando una URL de conexión unificada (`DATABASE_URL`). Sin embargo, ten en cuenta que existen otras opciones válidas de configuración en la plataforma (como el uso de variables separadas para host, usuario, contraseña, puerto y nombre de base de datos) según las preferencias de arquitectura de cada desarrollador.
+### Códigos de estado
 
-### 6. Diferencia clave entre URLs:
-   * **Internal URL (Red Interna):** Es la dirección privada que utiliza Railway para que tu servicio Node.js y PostgreSQL se comuniquen de forma ultrarrápida y segura dentro del mismo clúster en la nube.
-   * **Public URL (Dominio Público):** Es el enlace web público generado por Railway (ej. `https://miniblog-production.up.railway.app`) que permite a los usuarios externos y evaluadores acceder a la API y a la interfaz de Swagger desde internet.
+| Código | Cuándo |
+|---|---|
+| 200 | Lectura o actualización correcta |
+| 201 | Recurso creado |
+| 204 | Recurso eliminado (sin body) |
+| 400 | Campo obligatorio faltante, email/`published` inválido, ID que no es UUID, texto demasiado largo o JSON mal formado |
+| 404 | Autor/post inexistente, `author_id` inexistente o ruta desconocida |
+| 409 | El email ya está registrado (control de unicidad) |
+| 500 | Error inesperado del servidor |
 
-### 7. Internal URL vs Public URL:
+---
 
-**Internal URL**: Es la dirección de red privada que provee Railway para que tu servicio Node.js se comunique con la base de datos PostgreSQL de forma rápida y segura dentro del mismo clúster.
+## 🧪 Tests
 
-**Public URL**: Es el dominio web público generado por Railway (ej. `https://miniblog-production.up.railway.app`) que permite a los usuarios externos y colaboradores acceder a la API y a la documentación de Swagger desde internet.
+Son **tests de integración**: llaman a la API real con Supertest y usan la base de datos real, así validan el comportamiento completo (incluidos el UNIQUE del email, la FK, el CASCADE y los errores de PostgreSQL). Por eso necesitan PostgreSQL levantado con el schema aplicado:
 
-## 8. 🤖 Registro del Uso de Inteligencia Artificial (AI) en el Proyecto
+```bash
+npm run db:setup
+```
 
-Durante el desarrollo de esta API, se utilizó asistencia de Inteligencia Artificial (IA) como herramienta colaborativa para los siguientes propósitos:
+```bash
+npm test
+```
 
-Diseño de base de datos: Estructuración de esquemas relacionales utilizando extensiones nativas de PostgreSQL para la generación segura de UUIDs (gen_random_uuid()).
+La suite (`test/api.test.js`) tiene **26 tests** que cubren el CRUD completo de authors y posts, `/posts/author/:authorId` y los casos de error (400, 404, 409, JSON mal formado y ruta inexistente). Cada test crea sus propios datos con emails únicos y al terminar los borra, así no ensucia la base.
 
-Optimización de consultas SQL: Implementación de la cláusula RETURNING * en las operaciones de inserción y actualización para garantizar que la API devuelva los identificadores generados en tiempo de ejecución.
+> 💡 Si quieres una base separada para tests, crea otra (p. ej. `blog_db_test`) y ejecuta los comandos con esa `DATABASE_URL`.
 
-Depuración de errores: Resolución de bloqueos de servicios locales en Windows y errores de conexión a PostgreSQL (Connection refused).
+---
 
-Documentación: Estructuración y redacción de las especificaciones OpenAPI/Swagger y el presente archivo README.
+## 📄 Documentación OpenAPI / Swagger
 
-## Información más detallada del: 
+- **Swagger UI interactivo:** `/api-docs` (en local y en producción). Permite probar cada endpoint con *Try it out*.
+- **Archivo OpenAPI 3.0:** [`openapi.json`](openapi.json), en la raíz del repositorio. Se genera a partir de los comentarios `@swagger` de las rutas:
 
-- [Uso de IA](/documentacion/IA.md)
+```bash
+npm run docs:openapi
+```
+
+Si cambias la documentación de alguna ruta, vuelve a ejecutar este comando para actualizar `openapi.json`.
+
+---
+
+## ☁️ Deploy en Railway
+
+1. **Subir el código a GitHub.**
+2. En [Railway](https://railway.app/) crear un proyecto con **Deploy from GitHub repo** y elegir este repositorio.
+3. **Agregar PostgreSQL** al mismo proyecto (*New → Database → PostgreSQL*).
+4. **Variables del servicio Node.js** (*Variables*):
+   - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (referencia a la URL interna de la base).
+   - `NODE_ENV` = `production`.
+   - `PORT` lo asigna Railway automáticamente y el servidor lo lee con `process.env.PORT`.
+5. Railway ejecuta `npm install` y luego `npm start` (`node server.js`).
+6. **Crear las tablas en la base de Railway** (una sola vez, o después de cambiar el schema). Desde tu computadora, usando la URL **pública** de la base (`DATABASE_PUBLIC_URL` en Railway):
+
+   ```bash
+   DATABASE_URL="<DATABASE_PUBLIC_URL de Railway>" npm run db:seed
+   ```
+
+   Si la conexión pide SSL, agrega `DB_SSL=true` delante del comando.
+7. En *Settings → Networking* generar un dominio público y comprobar `/` y `/api-docs`.
+
+### Internal URL vs Public URL
+
+- **Internal URL** (`DATABASE_URL`, `*.railway.internal`): red privada de Railway. La usa la API en producción para hablar con PostgreSQL; es más rápida y no está expuesta a internet.
+- **Public URL** (`DATABASE_PUBLIC_URL` y el dominio `*.up.railway.app`): acceso desde fuera de Railway. La de la base sirve para ejecutar `db:setup`/`db:seed` desde tu computadora; la del servicio es la que usan los usuarios y evaluadores para consumir la API y Swagger.
+
+---
+
+## 🤖 Uso de Inteligencia Artificial
+
+Durante el desarrollo se usó IA como herramienta de apoyo para:
+
+- **Diseño de base de datos:** esquema relacional con UUID generados por PostgreSQL (`gen_random_uuid()`).
+- **Consultas SQL:** uso de `RETURNING *` para devolver el registro creado o actualizado.
+- **Depuración:** errores de conexión a PostgreSQL en Windows (*Connection refused*).
+- **Documentación:** especificación OpenAPI/Swagger y este README.
+
+Más detalle en [documentacion/IA.md](documentacion/IA.md).

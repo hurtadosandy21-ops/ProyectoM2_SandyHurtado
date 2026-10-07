@@ -1,15 +1,21 @@
 {
   "name": "proyectom2_sandy-hurtado",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "API REST de MiniBlog (authors y posts) con Node.js, Express y PostgreSQL",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
+    "db:setup": "node setup.js",
+    "db:seed": "node setup.js --seed",
+    "docs:openapi": "node scripts/export-openapi.js",
     "test": "vitest run --globals"
   },
+  "engines": {
+    "node": ">=20"
+  },
   "keywords": [],
-  "author": "",
+  "author": "Sandy Hurtado",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
