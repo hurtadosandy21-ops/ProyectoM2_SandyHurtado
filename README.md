@@ -10,7 +10,13 @@ Este proyecto implementa el backend para un sistema de blog minimalista. Cuenta 
 ---
 ## Información detallada de: 
 
-- [Uso de IA](../documentacion/IA.md)
+- [Uso de IA](/documentacion/IA.md)
+
+### 🔗 Enlaces del Proyecto
+
+- **Swagger:** [Abrir Swagger](https://proyectom2sandyhurtado-production.up.railway.app/api-docs)
+
+- **Railway (Producción):** [Abrir Railway](https://proyectom2sandyhurtado-production.up.railway.app/)
 
 ## 🛠️ Requisitos y Pasos para Ejecutar Local
 
@@ -87,11 +93,17 @@ npm test
 
 La documentación interactiva de la API está integrada mediante Swagger.
 
-En entorno local: Una vez que tu servidor esté encendido, abre en tu navegador:
-http://localhost:3000/api-docs
+En entorno local: Una vez que tu servidor esté encendido, abre en tu navegador.
+ 
+ Ejemplo de link :
+
+`http://localhost:8080/api-docs`
 
 En producción (Railway):
-https://tu-proyecto.up.railway.app/api-docs
+
+Ejemplo de link :
+
+`https://tu-proyecto.up.railway.app/api-docs`
 
 
 ## ☁️ Guía de Deployment en Railway
